@@ -1204,6 +1204,12 @@
             'S': 's'
         };
 
+        function cleanSum(sumStr) {
+    if (!sumStr) return 0;
+    if (typeof sumStr === 'number') return sumStr;
+    return parseFloat(String(sumStr).replace(/[€$₽\s,]/g, '')) || 0;
+}
+
         function normalizeCards(cardsString) {
             if (!cardsString || cardsString === 'X X') return null;
 
@@ -1421,7 +1427,7 @@
                     var action = actions[a];
                     var player = action.getAttribute('player');
                     var type = parseInt(action.getAttribute('type') || 0);
-                    var sum = parseFloat(action.getAttribute('sum') || 0);
+                    var sum = cleanSum(action.getAttribute('sum'));
 
                     allActions.push({
                         player: player,
