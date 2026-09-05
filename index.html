@@ -1449,7 +1449,7 @@
             for (var i = 0; i < heroActions.length; i++) {
                 var action = heroActions[i];
                 var type = action.type;
-                var sum = action.sum;
+                var sum = cleanSum(action.sum);
 
                 if (type === ACTION_TYPES.SB || type === ACTION_TYPES.BB) {
                     totalInvested += sum;
