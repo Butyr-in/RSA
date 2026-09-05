@@ -1098,7 +1098,7 @@
       }
     };
 
-    DataManager.prototype.updateSettings = function(settings) {
+     DataManager.prototype.updateSettings = function(settings) {
       this.settings = Object.assign({}, this.settings, settings);
       this.saveSettings();
       if (this.heroNick && this.hands.length > 0) {
@@ -1108,12 +1108,106 @@
 
     // ============================================================
     // ГЛАВНОЕ ПРИЛОЖЕНИЕ
+    // ============================================================
+    
+    // Глобальное состояние
+    var AppState = {
+      currentView: 'hands',
+      dateStart: null,
+      dateEnd: null,
+      expandedDay: null,
+      widgetModes: {
+        limit: 'average',
+        hands: 'total',
+        time: 'hours',
+        result: 'eur'
+      },
+      theme: 'light',
+      isProcessing: false,
+      chart: null,
+      dataManager: null
+    };
 
+    // Инициализация приложения
+    function initApp() {
+      console.log('🚀 Poker Hand Analyzer starting...');
+      
+      if (typeof Chart === 'undefined') {
+        showNotification('❌ Ошибка: Chart.js не загружен', 'error');
+        return;
+      }
+      
+      if (typeof JSZip === 'undefined') {
+        showNotification('❌ Ошибка: JSZip не загружен', 'error');
+        return;
+      }
+      
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initApp);
+        return;
+      }
+      
+      AppState.dataManager = new DataManager();
+      loadSettings();
+      AppState.dataManager.loadHands();
+      updatePlayerList();
+      
+      if (AppState.dataManager.heroNick) {
+        document.getElementById('playerSelect').value = AppState.dataManager.heroNick;
+        AppState.dataManager.initAfterHeroSelection();
+      }
+      
+      updateLimitFilter();
+      setupEvents();
+      updateUI();
+      initChart();
+      
+      document.getElementById('currentYear').textContent = new Date().getFullYear();
+      console.log('✅ Poker Hand Analyzer initialized successfully!');
+    }
+
+    // Загрузка настроек
+    function loadSettings() {
+      var settings = AppState.dataManager.settings;
+      
+      AppState.theme = settings.theme || 'light';
+      applyTheme(AppState.theme);
+      
+      var dayStartHours = Math.floor(settings.dayStartHour);
+      var dayStartMinutes = (settings.dayStartHour % 1) * 60;
+      var dayStartEl = document.getElementById('dayStart');
+      if (dayStartEl) {
+        dayStartEl.value = String(dayStartHours).padStart(2, '0') + ':' + String(dayStartMinutes).padStart(2, '0');
+      }
+      
+      var sessionBreakEl = document.getElementById('sessionBreak');
+      if (sessionBreakEl) {
+        sessionBreakEl.value = settings.sessionBreakMinutes;
+      }
+      
+      if (settings.currencyRates) {
+        var usdRate = document.getElementById('usdRate');
+        var eurRate = document.getElementById('eurRate');
+        var rubRate = document.getElementById('rubRate');
+        if (usdRate) usdRate.value = settings.currencyRates.USD || 1.10;
+        if (eurRate) eurRate.value = settings.currencyRates.EUR || 1.00;
+        if (rubRate) rubRate.value = settings.currencyRates.RUB || 90.00;
+      }
+      
+      if (settings.widgetModes) {
+        AppState.widgetModes = settings.widgetModes;
+      }
+    }
 
     // Применение темы
     function applyTheme(theme) {
       AppState.theme = theme;
-      document.getElementById('app').className = 'app ' + theme + '-theme';
+      var app = document.getElementById('app');
+      if (app) {
+        app.className = 'app ' + theme + '-theme';
+      } else {
+        console.warn('⚠️ Element #app not found, theme not applied');
+      }
     }
 
     // Обновление списка игроков
