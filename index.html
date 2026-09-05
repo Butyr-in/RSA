@@ -2599,70 +2599,75 @@
     }
 
     AppState.isProcessing = true;
-            var files = Array.from(fileList);
+    var files = Array.from(fileList);
 
-            var xmlFiles = [];
-            var archives = [];
+    var xmlFiles = [];
+    var archives = [];
 
-            for (var i = 0; i < files.length; i++) {
-                var file = files[i];
-                var ext = file.name.split('.').pop().toLowerCase();
-                if (ext === 'xml') {
-                    xmlFiles.push(file);
-                } else if (ext === 'zip' || ext === 'rar') {
-                    archives.push(file);
-                }
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        var ext = file.name.split('.').pop().toLowerCase();
+        if (ext === 'xml') {
+            xmlFiles.push(file);
+        } else if (ext === 'zip' || ext === 'rar') {
+            archives.push(file);
+        }
+    }
+
+    if (xmlFiles.length === 0 && archives.length === 0) {
+        showNotification('Не найдено файлов для обработки (.xml, .zip, .rar)', 'warning');
+        AppState.isProcessing = false;
+        return;
+    }
+
+    showProgress();
+    updateProgress('extracting', 'Распаковка архивов...', 0);
+
+    var extractedFiles = [];
+    var totalFiles = xmlFiles.length;
+
+    for (var a = 0; a < archives.length; a++) {
+        try {
+            var extracted = await extractArchive(archives[a]);
+            extractedFiles = extractedFiles.concat(extracted);
+            totalFiles += extracted.length;
+        } catch (error) {
+            console.error('Error extracting archive:', error);
+            showNotification('Ошибка распаковки: ' + archives[a].name, 'error');
+        }
+    }
+
+    var allFiles = xmlFiles.concat(extractedFiles);
+    updateProgress('parsing', 'Обработка файлов...', 0, allFiles.length);
+
+    var allHands = [];
+    var processed = 0;
+    var heroNick = AppState.dataManager.heroNick || 'GNKTABACCO';
+
+    for (var f = 0; f < allFiles.length; f++) {
+        var file = allFiles[f];
+        try {
+            var content = await file.text();
+            var hands = parseXMLFile(content, heroNick);
+            if (hands && hands.length > 0) {
+                allHands = allHands.concat(hands);
             }
+        } catch (error) {
+            console.error('Error parsing file:', file.name, error);
+        }
 
-            if (xmlFiles.length === 0 && archives.length === 0) {
-                showNotification('Не найдено файлов для обработки (.xml, .zip, .rar)', 'warning');
-                AppState.isProcessing = false;
-                return;
-            }
+        processed++;
+        var progress = (processed / allFiles.length) * 100;
+        updateProgress('parsing', 'Обработка файлов...', progress, allFiles.length, processed);
+    }
 
-            showProgress();
-            updateProgress('extracting', 'Распаковка архивов...', 0);
+    updateProgress('saving', 'Сохранение данных...', 100);
 
-            var extractedFiles = [];
-            var totalFiles = xmlFiles.length;
+    // ===== ГЛАВНОЕ ИСПРАВЛЕНИЕ =====
+    // Сохраняем руки в DataManager
+    var result = AppState.dataManager.addHands(allHands);
+    // =================================
 
-            for (var a = 0; a < archives.length; a++) {
-                try {
-                    var extracted = await extractArchive(archives[a]);
-                    extractedFiles = extractedFiles.concat(extracted);
-                    totalFiles += extracted.length;
-                } catch (error) {
-                    console.error('Error extracting archive:', error);
-                    showNotification('Ошибка распаковки: ' + archives[a].name, 'error');
-                }
-            }
-
-            var allFiles = xmlFiles.concat(extractedFiles);
-            updateProgress('parsing', 'Обработка файлов...', 0, allFiles.length);
-
-            var allHands = [];
-            var processed = 0;
-
-            for (var f = 0; f < allFiles.length; f++) {
-                var file = allFiles[f];
-                try {
-                    var content = await file.text();
-                    var hands = parseXMLFile(content, AppState.dataManager.heroNick);
-                    if (hands && hands.length > 0) {
-                        allHands = allHands.concat(hands);
-                    }
-                } catch (error) {
-                    console.error('Error parsing file:', file.name, error);
-                }
-
-                processed++;
-                var progress = (processed / allFiles.length) * 100;
-                updateProgress('parsing', 'Обработка файлов...', progress, allFiles.length, processed);
-            }
-
-            updateProgress('saving', 'Сохранение данных...', 100);
-
-            var result = AppState.dataManager.addHands(allHands);
     document.getElementById('totalHandsFound').textContent = allHands.length;
     document.getElementById('newHandsAdded').textContent = result.added;
     document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
@@ -2673,14 +2678,12 @@
     if (result.added > 0) {
         showNotification('✅ Добавлено ' + result.added + ' новых рук (' + result.duplicates + ' пропущено дублей)', 'success');
         
-        // ===== НОВЫЙ КОД =====
         // Обновляем список игроков
         updatePlayerList();
         // Если игрок еще не выбран, подсказываем
         if (!AppState.dataManager.heroNick) {
             showNotification('👤 Выберите игрока из списка', 'info');
         }
-        // =====================
         
         updateUI();
         updateChart();
