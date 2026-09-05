@@ -1204,6 +1204,147 @@
             'S': 's'
         };
 
+// ============================================================
+// INDEXEDDB ХРАНИЛИЩЕ
+// ============================================================
+
+const DB_NAME = 'PokerStatsDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'hands';
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        
+        request.onerror = function(event) {
+            console.error('❌ Ошибка открытия IndexedDB:', event.target.error);
+            reject(event.target.error);
+        };
+        
+        request.onsuccess = function(event) {
+            resolve(event.target.result);
+        };
+        
+        request.onupgradeneeded = function(event) {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const store = db.createObjectStore(STORE_NAME, { keyPath: 'gamecode' });
+                store.createIndex('startDate', 'startDate', { unique: false });
+                store.createIndex('heroName', 'heroName', { unique: false });
+                console.log('✅ Создано хранилище IndexedDB');
+            }
+        };
+    });
+}
+
+function saveHandsToDB(hands) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const db = await openDB();
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            
+            for (const hand of hands) {
+                // Проверяем, есть ли уже такая рука
+                const getRequest = store.get(hand.gamecode);
+                getRequest.onsuccess = function() {
+                    if (!getRequest.result) {
+                        store.put(hand);
+                    }
+                };
+                getRequest.onerror = function() {
+                    console.warn('⚠️ Ошибка проверки дубля:', hand.gamecode);
+                };
+            }
+            
+            transaction.oncomplete = function() {
+                console.log('✅ Данные сохранены в IndexedDB');
+                resolve();
+            };
+            
+            transaction.onerror = function(event) {
+                console.error('❌ Ошибка сохранения в IndexedDB:', event.target.error);
+                reject(event.target.error);
+            };
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+function loadHandsFromDB() {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const db = await openDB();
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAll();
+            
+            request.onsuccess = function() {
+                const hands = request.result || [];
+                // Восстанавливаем Date объекты
+                const parsedHands = hands.map(h => ({
+                    ...h,
+                    startDate: new Date(h.startDate)
+                }));
+                console.log(`✅ Загружено ${parsedHands.length} рук из IndexedDB`);
+                resolve(parsedHands);
+            };
+            
+            request.onerror = function(event) {
+                console.error('❌ Ошибка загрузки из IndexedDB:', event.target.error);
+                reject(event.target.error);
+            };
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+function clearHandsFromDB() {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const db = await openDB();
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.clear();
+            
+            request.onsuccess = function() {
+                console.log('✅ IndexedDB очищена');
+                resolve();
+            };
+            
+            request.onerror = function(event) {
+                console.error('❌ Ошибка очистки IndexedDB:', event.target.error);
+                reject(event.target.error);
+            };
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+function countHandsInDB() {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const db = await openDB();
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.count();
+            
+            request.onsuccess = function() {
+                resolve(request.result);
+            };
+            
+            request.onerror = function(event) {
+                reject(event.target.error);
+            };
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
         function cleanSum(sumStr) {
     if (!sumStr) return 0;
     if (typeof sumStr === 'number') return sumStr;
@@ -2230,37 +2371,44 @@
             dataManager: null
         };
 
-        function initApp() {
-            console.log('🚀 Poker Hand Analyzer starting...');
+        async function initApp() {
+    console.log('🚀 Poker Hand Analyzer starting...');
 
-            if (typeof Chart === 'undefined') {
-                showNotification('❌ Ошибка: Chart.js не загружен', 'error');
-                return;
-            }
+    if (typeof Chart === 'undefined') {
+        showNotification('❌ Ошибка: Chart.js не загружен', 'error');
+        return;
+    }
 
-            if (typeof JSZip === 'undefined') {
-                showNotification('❌ Ошибка: JSZip не загружен', 'error');
-                return;
-            }
+    if (typeof JSZip === 'undefined') {
+        showNotification('❌ Ошибка: JSZip не загружен', 'error');
+        return;
+    }
 
-            AppState.dataManager = new DataManager();
-            loadSettings();
-            AppState.dataManager.loadHands();
-            updatePlayerList();
+    AppState.dataManager = new DataManager();
+    loadSettings();
+    
+    // Асинхронная загрузка из IndexedDB
+    await AppState.dataManager.loadHands();
+    
+    updatePlayerList();
 
-            if (AppState.dataManager.heroNick) {
-                document.getElementById('playerSelect').value = AppState.dataManager.heroNick;
-                AppState.dataManager.initAfterHeroSelection();
-            }
+    if (AppState.dataManager.heroNick) {
+        document.getElementById('playerSelect').value = AppState.dataManager.heroNick;
+        AppState.dataManager.initAfterHeroSelection();
+    }
 
-            updateLimitFilter();
-            setupEvents();
-            updateUI();
-            initChart();
+    updateLimitFilter();
+    setupEvents();
+    updateUI();
+    initChart();
 
-            document.getElementById('currentYear').textContent = new Date().getFullYear();
-            console.log('✅ Poker Hand Analyzer initialized successfully!');
-        }
+    // Показываем количество загруженных рук
+    const count = await countHandsInDB();
+    console.log(`📊 Всего рук в БД: ${count}`);
+
+    document.getElementById('currentYear').textContent = new Date().getFullYear();
+    console.log('✅ Poker Hand Analyzer initialized successfully!');
+}
 
         function loadSettings() {
             var settings = AppState.dataManager.settings;
@@ -2410,16 +2558,17 @@
                 this.value = '';
             });
 
-            document.getElementById('resetBtn').addEventListener('click', function() {
-                if (confirm('Вы уверены, что хотите удалить все данные?')) {
-                    AppState.dataManager.clearAll();
-                    updateUI();
-                    updateChart();
-                    updatePlayerList();
-                    updateLimitFilter();
-                    document.getElementById('playerSelect').value = '';
-                }
-            });
+            document.getElementById('resetBtn').addEventListener('click', async function() {
+    if (confirm('Вы уверены, что хотите удалить все данные?')) {
+        await AppState.dataManager.clearAll();
+        updateUI();
+        updateChart();
+        updatePlayerList();
+        updateLimitFilter();
+        document.getElementById('playerSelect').value = '';
+        showNotification('✅ Все данные удалены', 'success');
+    }
+});
 
             document.querySelectorAll('.widget').forEach(function(widget) {
                 widget.addEventListener('click', function() {
@@ -2669,10 +2818,8 @@
 
     updateProgress('saving', 'Сохранение данных...', 100);
 
-    // ===== ГЛАВНОЕ ИСПРАВЛЕНИЕ =====
-    // Сохраняем руки в DataManager
-    var result = AppState.dataManager.addHands(allHands);
-    // =================================
+    // Сохраняем в IndexedDB (асинхронно)
+    var result = await AppState.dataManager.addHands(allHands);
 
     document.getElementById('totalHandsFound').textContent = allHands.length;
     document.getElementById('newHandsAdded').textContent = result.added;
@@ -2684,9 +2831,7 @@
     if (result.added > 0) {
         showNotification('✅ Добавлено ' + result.added + ' новых рук (' + result.duplicates + ' пропущено дублей)', 'success');
         
-        // Обновляем список игроков
         updatePlayerList();
-        // Если игрок еще не выбран, подсказываем
         if (!AppState.dataManager.heroNick) {
             showNotification('👤 Выберите игрока из списка', 'info');
         }
