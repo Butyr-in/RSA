@@ -45,13 +45,14 @@ function parseGame(gameNode, heroNick) {
   var heroPlayer = null;
   var heroIndex = -1;
   var win = 0;
+  var bet = cleanSum(node.getAttribute('bet'));
   
   // Собираем информацию об игроках
   for (var i = 0; i < playerNodes.length; i++) {
     var node = playerNodes[i];
     var name = node.getAttribute('name');
     var chips = parseFloat(node.getAttribute('chips') || 0);
-    var playerWin = parseFloat(node.getAttribute('win') || 0);
+    var playerWin = cleanSum(node.getAttribute('win'));
     var bet = parseFloat(node.getAttribute('bet') || 0);
     
     var player = {
