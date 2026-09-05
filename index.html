@@ -1358,9 +1358,9 @@
                     var action = actions0[a];
                     var type = parseInt(action.getAttribute('type'));
                     if (type === ACTION_TYPES.BB) {
-                        bigBlind = parseFloat(action.getAttribute('sum') || 0);
-                        break;
-                    }
+    bigBlind = cleanSum(action.getAttribute('sum'));
+    break;
+}
                 }
             }
 
