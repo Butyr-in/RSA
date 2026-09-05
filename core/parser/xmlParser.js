@@ -76,19 +76,24 @@ function parseGame(gameNode, heroNick) {
   if (!heroPlayer) return null;
   
   // Определяем лимит (по большому блайнду)
-  var bigBlind = 0;
-  var round0 = gameNode.querySelector('round[no="0"]');
-  if (round0) {
+  // Поиск большого блайнда
+var bigBlind = 0;
+var round0 = gameNode.querySelector('round[no="0"]');
+if (round0) {
     var actions0 = round0.querySelectorAll('action');
     for (var a = 0; a < actions0.length; a++) {
-      var action = actions0[a];
-      var type = parseInt(action.getAttribute('type'));
-      if (type === ACTION_TYPES.BB) {
-        bigBlind = parseFloat(action.getAttribute('sum') || 0);
-        break;
-      }
+        var action = actions0[a];
+        var type = parseInt(action.getAttribute('type'));
+        var sumStr = action.getAttribute('sum') || '0';
+        var sum = parseFloat(sumStr.replace(/[€$₽]/g, ''));
+        
+        // type 2 = BB
+        if (type === 2) {
+            bigBlind = sum;
+            break;
+        }
     }
-  }
+}
   
   // Парсим карты Hero
   var pocketCardsNode = gameNode.querySelector('cards[type="Pocket"][player="' + heroNick + '"]');
