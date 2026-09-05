@@ -2593,12 +2593,12 @@
         // ============================================================
 
         async function handleFiles(fileList) {
-            if (AppState.isProcessing) {
-                showNotification('⏳ Идет обработка, подождите...', 'warning');
-                return;
-            }
+    if (AppState.isProcessing) {
+        showNotification('⏳ Идет обработка, подождите...', 'warning');
+        return;
+    }
 
-            AppState.isProcessing = true;
+    AppState.isProcessing = true;
             var files = Array.from(fileList);
 
             var xmlFiles = [];
@@ -2663,26 +2663,35 @@
             updateProgress('saving', 'Сохранение данных...', 100);
 
             var result = AppState.dataManager.addHands(allHands);
-            document.getElementById('totalHandsFound').textContent = allHands.length;
-            document.getElementById('newHandsAdded').textContent = result.added;
-            document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
+    document.getElementById('totalHandsFound').textContent = allHands.length;
+    document.getElementById('newHandsAdded').textContent = result.added;
+    document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
 
-            hideProgress();
-            AppState.isProcessing = false;
+    hideProgress();
+    AppState.isProcessing = false;
 
-            if (result.added > 0) {
-                showNotification('✅ Добавлено ' + result.added + ' новых рук (' + result.duplicates +
-                    ' пропущено дублей)', 'success');
-                updateUI();
-                updateChart();
-                updatePlayerList();
-                updateLimitFilter();
-            } else {
-                showNotification('ℹ️ Новых рук не найдено (' + result.duplicates + ' уже загружены)', 'info');
-            }
-
-            closeModal('importModal');
+    if (result.added > 0) {
+        showNotification('✅ Добавлено ' + result.added + ' новых рук (' + result.duplicates + ' пропущено дублей)', 'success');
+        
+        // ===== НОВЫЙ КОД =====
+        // Обновляем список игроков
+        updatePlayerList();
+        // Если игрок еще не выбран, подсказываем
+        if (!AppState.dataManager.heroNick) {
+            showNotification('👤 Выберите игрока из списка', 'info');
         }
+        // =====================
+        
+        updateUI();
+        updateChart();
+        updatePlayerList(); // <-- ОБЯЗАТЕЛЬНО
+        updateLimitFilter();
+    } else {
+        showNotification('ℹ️ Новых рук не найдено (' + result.duplicates + ' уже загружены)', 'info');
+    }
+
+    closeModal('importModal');
+}
 
         async function extractArchive(file) {
             try {
