@@ -1,960 +1,2091 @@
-// app.js - Полный файл без import/export
+// ============================================================
+// КОНСТАНТЫ
+// ============================================================
 
-// ============================================================
-// Глобальные переменные
-// ============================================================
-const AppState = {
-  currentView: 'hands',
-  dateStart: null,
-  dateEnd: null,
-  expandedDay: null,
-  widgetModes: {
-    limit: 'average',
-    hands: 'total',
-    time: 'hours',
-    result: 'eur'
-  },
-  theme: 'light',
-  isProcessing: false,
-  chart: null,
-  dataManager: null
+const POSITIONS = {
+    BTN: 'BTN',
+    SB: 'SB',
+    BB: 'BB',
+    EP: 'EP',
+    EP_1: 'EP-1',
+    EP_2: 'EP-2',
+    EP_3: 'EP-3',
+    MP: 'MP',
+    CO: 'CO'
+};
+
+const POSITION_GROUPS = {
+    EP: ['EP', 'EP-1', 'EP-2', 'EP-3'],
+    MP: ['MP'],
+    CO: ['CO'],
+    BTN: ['BTN'],
+    BLINDS: ['SB', 'BB']
+};
+
+const ACTION_TYPES = {
+    FOLD: 0,
+    SB: 1,
+    BB: 2,
+    CALL: 3,
+    CHECK: 4,
+    BET: 5,
+    ALLIN: 7,
+    RAISE: 23
+};
+
+const DEFAULT_SETTINGS = {
+    dayStartHour: 6,
+    sessionBreakMinutes: 5,
+    currency: 'EUR',
+    theme: 'light',
+    currencyRates: {
+        USD: 1.10,
+        EUR: 1.00,
+        RUB: 90.00
+    }
 };
 
 // ============================================================
-// Инициализация приложения
+// ПОЗИЦИИ
 // ============================================================
-function initApp() {
-  // Проверяем наличие библиотек
-  if (typeof Chart === 'undefined') {
-    showNotification('❌ Ошибка: Chart.js не загружен', 'error');
-    return;
-  }
-  
-  if (typeof JSZip === 'undefined') {
-    showNotification('❌ Ошибка: JSZip не загружен', 'error');
-    return;
-  }
-  
-  // Создаем DataManager
-  AppState.dataManager = new DataManager();
-  
-  // Загружаем настройки
-  loadSettings();
-  
-  // Загружаем данные
-  AppState.dataManager.loadHands();
-  
-  // Обновляем список игроков
-  updatePlayerList();
-  
-  // Если есть сохраненный игрок, выбираем его
-  if (AppState.dataManager.heroNick) {
-    document.getElementById('playerSelect').value = AppState.dataManager.heroNick;
-    AppState.dataManager.initAfterHeroSelection();
-  }
-  
-  // Обновляем фильтр лимитов
-  updateLimitFilter();
-  
-  // Настраиваем события
-  setupEvents();
-  
-  // Обновляем UI
-  updateUI();
-  
-  // Инициализируем график
-  initChart();
-  
-  // Устанавливаем текущий год
-  document.getElementById('currentYear').textContent = new Date().getFullYear();
-}
 
-// ============================================================
-// Загрузка настроек
-// ============================================================
-function loadSettings() {
-  const settings = AppState.dataManager.settings;
-  
-  // Тема
-  AppState.theme = settings.theme || 'light';
-  applyTheme(AppState.theme);
-  
-  // Начало дня
-  const dayStartHours = Math.floor(settings.dayStartHour);
-  const dayStartMinutes = (settings.dayStartHour % 1) * 60;
-  document.getElementById('dayStart').value = 
-    `${String(dayStartHours).padStart(2, '0')}:${String(dayStartMinutes).padStart(2, '0')}`;
-  
-  // Разрыв сессий
-  document.getElementById('sessionBreak').value = settings.sessionBreakMinutes;
-  
-  // Курсы валют
-  if (settings.currencyRates) {
-    document.getElementById('usdRate').value = settings.currencyRates.USD || 1.10;
-    document.getElementById('eurRate').value = settings.currencyRates.EUR || 1.00;
-    document.getElementById('rubRate').value = settings.currencyRates.RUB || 90.00;
-  }
-  
-  // Режимы виджетов
-  if (settings.widgetModes) {
-    AppState.widgetModes = settings.widgetModes;
-  }
-}
+function getPosition(index, totalPlayers) {
+    if (index === 0) return POSITIONS.BTN;
+    if (index === 1) return POSITIONS.SB;
+    if (index === 2) return POSITIONS.BB;
 
-// ============================================================
-// Применение темы
-// ============================================================
-function applyTheme(theme) {
-  AppState.theme = theme;
-  document.getElementById('app').className = 'app ' + theme + '-theme';
-}
+    const remaining = totalPlayers - 3;
+    const positions = [];
 
-// ============================================================
-// Обновление списка игроков
-// ============================================================
-function updatePlayerList() {
-  const nicks = AppState.dataManager.getAllNicks();
-  const select = document.getElementById('playerSelect');
-  const currentValue = select.value;
-  
-  select.innerHTML = '<option value="">Выберите игрока</option>';
-  
-  for (const nick of nicks) {
-    const option = document.createElement('option');
-    option.value = nick;
-    option.textContent = nick;
-    select.appendChild(option);
-  }
-  
-  if (currentValue && nicks.includes(currentValue)) {
-    select.value = currentValue;
-  }
-}
-
-// ============================================================
-// Обновление фильтра лимитов
-// ============================================================
-function updateLimitFilter() {
-  const select = document.getElementById('limitFilter');
-  const currentValue = select.value;
-  
-  const limits = new Set();
-  for (const hand of AppState.dataManager.hands) {
-    limits.add(`NL${hand.limit}`);
-  }
-  
-  select.innerHTML = '<option value="all">Все лимиты</option>';
-  
-  for (const limit of limits) {
-    const option = document.createElement('option');
-    option.value = limit;
-    option.textContent = limit;
-    select.appendChild(option);
-  }
-  
-  if (currentValue && limits.has(currentValue)) {
-    select.value = currentValue;
-  }
-}
-
-// ============================================================
-// Настройка событий
-// ============================================================
-function setupEvents() {
-  // ===== Выбор игрока =====
-  document.getElementById('playerSelect').addEventListener('change', function() {
-    const nick = this.value;
-    AppState.dataManager.setHero(nick, AppState.dataManager.aliases);
-    updateUI();
-    updateChart();
-  });
-  
-  // ===== Алиасы =====
-  document.getElementById('aliasBtn').addEventListener('click', function() {
-    document.getElementById('aliasInput').value = (AppState.dataManager.aliases || []).join(', ');
-    openModal('aliasModal');
-  });
-  
-  document.getElementById('saveAliases').addEventListener('click', function() {
-    const input = document.getElementById('aliasInput').value;
-    const aliases = input.split(',').map(s => s.trim()).filter(s => s);
-    AppState.dataManager.aliases = aliases;
-    AppState.dataManager.recalculateStats();
-    updateUI();
-    updateChart();
-    closeModal('aliasModal');
-  });
-  
-  document.getElementById('cancelAliases').addEventListener('click', function() {
-    closeModal('aliasModal');
-  });
-  
-  document.getElementById('aliasModalClose').addEventListener('click', function() {
-    closeModal('aliasModal');
-  });
-  
-  // ===== Импорт =====
-  document.getElementById('importBtn').addEventListener('click', function() {
-    openModal('importModal');
-  });
-  
-  document.getElementById('importModalClose').addEventListener('click', function() {
-    closeModal('importModal');
-  });
-  
-  setupDropZone();
-  
-  document.getElementById('selectFilesBtn').addEventListener('click', function() {
-    document.getElementById('fileInput').click();
-  });
-  
-  document.getElementById('selectFolderBtn').addEventListener('click', function() {
-    document.getElementById('folderInput').click();
-  });
-  
-  document.getElementById('fileInput').addEventListener('change', function(e) {
-    handleFiles(e.target.files);
-    this.value = '';
-  });
-  
-  document.getElementById('folderInput').addEventListener('change', function(e) {
-    handleFiles(e.target.files);
-    this.value = '';
-  });
-  
-  // ===== Сброс =====
-  document.getElementById('resetBtn').addEventListener('click', function() {
-    if (confirm('Вы уверены, что хотите удалить все данные?')) {
-      AppState.dataManager.clearAll();
-      updateUI();
-      updateChart();
-      updatePlayerList();
-      updateLimitFilter();
-      document.getElementById('playerSelect').value = '';
+    if (totalPlayers <= 6) {
+        if (remaining === 1) positions.push(POSITIONS.CO);
+        else if (remaining === 2) positions.push(POSITIONS.MP, POSITIONS.CO);
+        else if (remaining === 3) positions.push(POSITIONS.EP, POSITIONS.MP, POSITIONS.CO);
+    } else if (totalPlayers === 7) {
+        positions.push(POSITIONS.EP_1, POSITIONS.EP, POSITIONS.MP, POSITIONS.CO);
+    } else if (totalPlayers === 8) {
+        positions.push(POSITIONS.EP_2, POSITIONS.EP_1, POSITIONS.EP, POSITIONS.MP, POSITIONS.CO);
+    } else if (totalPlayers === 9) {
+        positions.push(POSITIONS.EP_3, POSITIONS.EP_2, POSITIONS.EP_1, POSITIONS.EP, POSITIONS.MP, POSITIONS.CO);
     }
-  });
-  
-  // ===== Виджеты =====
-  document.querySelectorAll('.widget').forEach(function(widget) {
-    widget.addEventListener('click', function() {
-      const type = this.dataset.widget;
-      toggleWidgetMode(type);
-    });
-  });
-  
-  // ===== График =====
-  document.querySelectorAll('.chart-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      AppState.currentView = this.dataset.mode;
-      updateChart();
-    });
-  });
-  
-  document.getElementById('dateStart').addEventListener('change', function() {
-    AppState.dateStart = this.value;
-    updateChart();
-  });
-  
-  document.getElementById('dateEnd').addEventListener('change', function() {
-    AppState.dateEnd = this.value;
-    updateChart();
-  });
-  
-  document.getElementById('clearDateFilter').addEventListener('click', function() {
-    AppState.dateStart = null;
-    AppState.dateEnd = null;
-    document.getElementById('dateStart').value = '';
-    document.getElementById('dateEnd').value = '';
-    updateChart();
-  });
-  
-  // ===== Настройки нижней панели =====
-  document.getElementById('dayStart').addEventListener('change', function() {
-    const [hours, minutes] = this.value.split(':').map(Number);
-    AppState.dataManager.updateSettings({
-      dayStartHour: hours + minutes / 60
-    });
-    updateUI();
-    updateDayList();
-  });
-  
-  document.getElementById('sessionBreak').addEventListener('change', function() {
-    const minutes = parseInt(this.value) || 5;
-    AppState.dataManager.updateSettings({
-      sessionBreakMinutes: minutes
-    });
-    updateDayList();
-  });
-  
-  // ===== Курсы валют =====
-  document.getElementById('updateRatesBtn').addEventListener('click', function() {
-    fetchExchangeRates();
-  });
-  
-  document.getElementById('usdRate').addEventListener('change', saveCurrencyRates);
-  document.getElementById('eurRate').addEventListener('change', saveCurrencyRates);
-  document.getElementById('rubRate').addEventListener('change', saveCurrencyRates);
-  
-  // ===== Закрытие модалок =====
-  document.getElementById('overlay').addEventListener('click', function() {
-    closeAllModals();
-  });
-  
-  // ===== Клавиатура =====
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-      closeAllModals();
-    }
-  });
+
+    return positions[index - 3] || 'UNKNOWN';
 }
 
-// ============================================================
-// Drop Zone
-// ============================================================
-function setupDropZone() {
-  const zone = document.getElementById('dropZone');
-  
-  ['dragenter', 'dragover'].forEach(function(event) {
-    zone.addEventListener(event, function(e) {
-      e.preventDefault();
-      zone.classList.add('drag-over');
-    });
-  });
-  
-  ['dragleave', 'drop'].forEach(function(event) {
-    zone.addEventListener(event, function(e) {
-      e.preventDefault();
-      zone.classList.remove('drag-over');
-    });
-  });
-  
-  zone.addEventListener('drop', function(e) {
-    e.preventDefault();
-    const items = e.dataTransfer.items;
-    const files = [];
-    
-    for (const item of items) {
-      const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
-      
-      if (entry) {
-        if (entry.isDirectory) {
-          traverseDirectory(entry, files);
-        } else if (entry.isFile) {
-          entry.file(function(file) {
-            files.push(file);
-            if (files.length === items.length) {
-              handleFiles(files);
-            }
-          });
+function getPositionGroup(position) {
+    for (var group in POSITION_GROUPS) {
+        if (POSITION_GROUPS[group].indexOf(position) !== -1) {
+            return group;
         }
-      } else {
-        const file = item.getAsFile();
-        if (file) files.push(file);
-      }
     }
-    
-    if (files.length > 0) {
-      handleFiles(files);
-    }
-  });
-}
-
-function traverseDirectory(entry, files) {
-  const reader = entry.createReader();
-  
-  reader.readEntries(function(entries) {
-    for (const childEntry of entries) {
-      if (childEntry.isDirectory) {
-        traverseDirectory(childEntry, files);
-      } else if (childEntry.isFile) {
-        childEntry.file(function(file) {
-          files.push(file);
-        });
-      }
-    }
-  });
+    return 'UNKNOWN';
 }
 
 // ============================================================
-// Обработка файлов
+// КАРТЫ
 // ============================================================
-async function handleFiles(fileList) {
-  if (AppState.isProcessing) {
-    showNotification('⏳ Идет обработка, подождите...', 'warning');
-    return;
-  }
-  
-  AppState.isProcessing = true;
-  const files = Array.from(fileList);
-  
-  const xmlFiles = [];
-  const archives = [];
-  
-  for (const file of files) {
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (ext === 'xml') {
-      xmlFiles.push(file);
-    } else if (ext === 'zip' || ext === 'rar') {
-      archives.push(file);
-    }
-  }
-  
-  if (xmlFiles.length === 0 && archives.length === 0) {
-    showNotification('Не найдено файлов для обработки (.xml, .zip, .rar)', 'warning');
-    AppState.isProcessing = false;
-    return;
-  }
-  
-  showProgress();
-  updateProgress('extracting', 'Распаковка архивов...', 0);
-  
-  let extractedFiles = [];
-  let totalFiles = xmlFiles.length;
-  
-  for (const archive of archives) {
-    try {
-      const extracted = await extractArchive(archive);
-      extractedFiles = extractedFiles.concat(extracted);
-      totalFiles += extracted.length;
-    } catch (error) {
-      console.error('Error extracting archive:', error);
-      showNotification('Ошибка распаковки: ' + archive.name, 'error');
-    }
-  }
-  
-  const allFiles = xmlFiles.concat(extractedFiles);
-  updateProgress('parsing', 'Обработка файлов...', 0, allFiles.length);
-  
-  const allHands = [];
-  let processed = 0;
-  
-  for (const file of allFiles) {
-    try {
-      const content = await file.text();
-      const hands = parseXMLFile(content, AppState.dataManager.heroNick);
-      if (hands && hands.length > 0) {
-        allHands.push.apply(allHands, hands);
-      }
-    } catch (error) {
-      console.error('Error parsing file:', file.name, error);
-    }
-    
-    processed++;
-    const progress = (processed / allFiles.length) * 100;
-    updateProgress('parsing', 'Обработка файлов...', progress, allFiles.length, processed);
-  }
-  
-  updateProgress('saving', 'Сохранение данных...', 100);
-  
-  const result = AppState.dataManager.addHands(allHands);
-  document.getElementById('totalHandsFound').textContent = allHands.length;
-  document.getElementById('newHandsAdded').textContent = result.added;
-  document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
-  
-  hideProgress();
-  AppState.isProcessing = false;
-  
-  if (result.added > 0) {
-    showNotification('✅ Добавлено ' + result.added + ' новых рук (' + result.duplicates + ' пропущено дублей)', 'success');
-    updateUI();
-    updateChart();
-    updatePlayerList();
-    updateLimitFilter();
-  } else {
-    showNotification('ℹ️ Новых рук не найдено (' + result.duplicates + ' уже загружены)', 'info');
-  }
-  
-  closeModal('importModal');
-}
 
-async function extractArchive(file) {
-  try {
-    const zip = await JSZip.loadAsync(file);
-    const files = [];
-    
-    for (const [path, zipEntry] of Object.entries(zip.files)) {
-      if (zipEntry.name.endsWith('.xml') && !zipEntry.dir) {
-        const content = await zipEntry.async('string');
-        const extractedFile = new File([content], zipEntry.name, { type: 'text/xml' });
-        files.push(extractedFile);
-      }
-    }
-    
-    return files;
-  } catch (error) {
-    console.error('Error extracting archive:', error);
-    return [];
-  }
-}
+const RANK_ORDER = {
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
+    '7': 7,
+    '8': 8,
+    '9': 9,
+    '10': 10,
+    'J': 11,
+    'Q': 12,
+    'K': 13,
+    'A': 14
+};
 
-// ============================================================
-// Прогресс-бар
-// ============================================================
-function showProgress() {
-  document.getElementById('progressContainer').classList.remove('hidden');
-  document.getElementById('progressFill').style.width = '0%';
-  document.getElementById('progressPercentage').textContent = '0%';
-  document.getElementById('processedFiles').textContent = '0';
-  document.getElementById('totalFiles').textContent = '0';
-  document.getElementById('totalHandsFound').textContent = '0';
-  document.getElementById('newHandsAdded').textContent = '0';
-  document.getElementById('duplicateHandsSkipped').textContent = '0';
-}
+const RANK_TO_SYMBOL = {
+    '2': '2',
+    '3': '3',
+    '4': '4',
+    '5': '5',
+    '6': '6',
+    '7': '7',
+    '8': '8',
+    '9': '9',
+    '10': 'T',
+    'J': 'J',
+    'Q': 'Q',
+    'K': 'K',
+    'A': 'A'
+};
 
-function updateProgress(stage, message, percent, total, processed) {
-  const stageMap = {
-    'extracting': '📦 Распаковка архивов...',
-    'parsing': '📄 Обработка файлов...',
-    'saving': '💾 Сохранение данных...'
-  };
-  
-  document.getElementById('progressStage').textContent = message || stageMap[stage] || stage;
-  document.getElementById('progressFill').style.width = Math.min(percent, 100) + '%';
-  document.getElementById('progressPercentage').textContent = Math.round(Math.min(percent, 100)) + '%';
-  
-  if (total > 0) {
-    document.getElementById('processedFiles').textContent = processed;
-    document.getElementById('totalFiles').textContent = total;
-  }
-}
+const SUIT_MAP = {
+    'C': 'c',
+    'D': 'd',
+    'H': 'h',
+    'S': 's'
+};
 
-function hideProgress() {
-  document.getElementById('progressContainer').classList.add('hidden');
-  document.getElementById('progressFill').style.width = '0%';
-}
+function normalizeCards(cardsString) {
+    if (!cardsString || cardsString === 'X X') return null;
 
-// ============================================================
-// Модалки
-// ============================================================
-function openModal(id) {
-  document.getElementById('overlay').classList.remove('hidden');
-  document.getElementById(id).classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
-}
+    var parts = cardsString.split(' ');
+    if (parts.length !== 2) return null;
 
-function closeModal(id) {
-  document.getElementById(id).classList.add('hidden');
-  document.getElementById('overlay').classList.add('hidden');
-  document.body.style.overflow = '';
-}
+    var card1 = parseCard(parts[0]);
+    var card2 = parseCard(parts[1]);
 
-function closeAllModals() {
-  document.querySelectorAll('.modal').forEach(function(m) {
-    m.classList.add('hidden');
-  });
-  document.getElementById('overlay').classList.add('hidden');
-  document.body.style.overflow = '';
-}
+    if (!card1 || !card2) return null;
 
-// ============================================================
-// UI Обновление
-// ============================================================
-function updateUI() {
-  const stats = AppState.dataManager.getStats();
-  updateWidgets(stats);
-  updateDayList();
-}
-
-function updateWidgets(stats) {
-  const widgets = AppState.widgetModes;
-  const currencySymbol = getCurrencySymbol();
-  
-  // Лимит
-  if (widgets.limit === 'average') {
-    document.getElementById('avgLimit').textContent = 'NL' + (stats.averageLimit || 0);
-  } else {
-    document.getElementById('avgLimit').textContent = stats.favoriteLimit || 'NL0';
-  }
-  document.getElementById('favoriteLimit').textContent = 'Любимый: ' + (stats.favoriteLimit || 'NL0');
-  
-  // Раздачи
-  const totalHands = stats.totalHands || 0;
-  document.getElementById('totalHands').textContent = totalHands;
-  
-  if (widgets.hands === 'total') {
-    document.getElementById('handsPerHour').textContent = totalHands + ' всего';
-  } else if (widgets.hands === 'perHour') {
-    const hours = (stats.totalTime || 0) / 3600;
-    const perHour = hours > 0 ? Math.round(totalHands / hours) : 0;
-    document.getElementById('handsPerHour').textContent = perHour + '/час';
-  } else {
-    const days = Object.keys(stats.days || {}).length || 1;
-    const perDay = Math.round(totalHands / days);
-    document.getElementById('handsPerHour').textContent = perDay + '/день';
-  }
-  
-  // Время
-  if (widgets.time === 'hours') {
-    document.getElementById('totalTime').textContent = formatTime(stats.totalTime || 0);
-  } else {
-    document.getElementById('totalTime').textContent = formatMinutes(stats.totalTime || 0);
-  }
-  document.getElementById('totalTimeMinutes').textContent = formatMinutes(stats.totalTime || 0);
-  
-  // Результат
-  const result = stats.netResult || 0;
-  document.getElementById('netResult').textContent = currencySymbol + result.toFixed(2);
-  document.getElementById('netResult').className = 'widget-value ' + (result >= 0 ? 'positive' : 'negative');
-  
-  const wonHands = stats.totalWon || 0;
-  document.getElementById('resultDetails').textContent = wonHands + ' рук выиграно';
-}
-
-function updateDayList() {
-  const days = AppState.dataManager.getDays({
-    dayStartHour: AppState.dataManager.settings.dayStartHour,
-    sessionBreakMinutes: AppState.dataManager.settings.sessionBreakMinutes
-  });
-  
-  const container = document.getElementById('dayList');
-  const currencySymbol = getCurrencySymbol();
-  
-  if (days.length === 0) {
-    container.innerHTML = '<div class="empty-state">Нет данных для отображения</div>';
-    return;
-  }
-  
-  let html = '';
-  
-  for (const day of days) {
-    const isExpanded = AppState.expandedDay === day.day;
-    const resultClass = day.netResult >= 0 ? 'positive' : 'negative';
-    
-    html += '<div class="day-item">';
-    html += '<div class="day-header" data-day="' + day.day + '">';
-    html += '<span class="day-date">' + formatDate(day.day) + '</span>';
-    html += '<div class="day-stats">';
-    html += '<span class="hands-count">' + day.totalHands + ' рук</span>';
-    html += '<span class="time">' + formatTime(day.totalTime) + '</span>';
-    html += '<span class="result ' + resultClass + '">' + currencySymbol + day.netResult.toFixed(2) + '</span>';
-    html += '</div></div>';
-    
-    html += '<div class="day-sessions' + (isExpanded ? '' : ' hidden') + '" id="sessions-' + day.day + '">';
-    
-    if (isExpanded) {
-      for (const session of day.sessions) {
-        const sessionClass = session.netResult >= 0 ? 'positive' : 'negative';
-        html += '<div class="session-item">';
-        html += '<span class="session-time">' + formatTimeSession(session.startTime, session.endTime) + '</span>';
-        html += '<span class="session-hands">' + session.handsCount + ' рук</span>';
-        html += '<span class="session-result ' + sessionClass + '">' + currencySymbol + session.netResult.toFixed(2) + '</span>';
-        html += '</div>';
-      }
-    }
-    
-    html += '</div></div>';
-  }
-  
-  container.innerHTML = html;
-  
-  // Навешиваем события на заголовки дней
-  container.querySelectorAll('.day-header').forEach(function(header) {
-    header.addEventListener('click', function() {
-      const dayKey = this.dataset.day;
-      toggleDay(dayKey);
+    var cards = [card1, card2].sort(function(a, b) {
+        if (a.rank !== b.rank) return b.rank - a.rank;
+        return a.suit.localeCompare(b.suit);
     });
-  });
+
+    return cards.map(function(c) {
+        return c.rankSymbol + c.suit;
+    }).join('');
 }
 
-function toggleDay(dayKey) {
-  if (AppState.expandedDay === dayKey) {
-    AppState.expandedDay = null;
-  } else {
-    AppState.expandedDay = dayKey;
-  }
-  updateDayList();
-}
+function parseCard(cardStr) {
+    var suit = cardStr.charAt(0);
+    var rank = cardStr.substring(1);
 
-// ============================================================
-// Виджеты переключение
-// ============================================================
-function toggleWidgetMode(type) {
-  const modes = {
-    limit: ['average', 'favorite'],
-    hands: ['total', 'perHour', 'perDay'],
-    time: ['hours', 'minutes'],
-    result: ['eur', 'usd', 'rub']
-  };
-  
-  const current = AppState.widgetModes[type];
-  const modeList = modes[type];
-  const currentIndex = modeList.indexOf(current);
-  const nextIndex = (currentIndex + 1) % modeList.length;
-  AppState.widgetModes[type] = modeList[nextIndex];
-  
-  AppState.dataManager.updateSettings({ widgetModes: AppState.widgetModes });
-  updateUI();
+    if (!SUIT_MAP[suit]) return null;
+
+    return {
+        suit: SUIT_MAP[suit],
+        rank: RANK_ORDER[rank],
+        rankSymbol: RANK_TO_SYMBOL[rank]
+    };
 }
 
 // ============================================================
-// График
+// ВРЕМЯ
 // ============================================================
-function initChart() {
-  const ctx = document.getElementById('chartCanvas').getContext('2d');
-  
-  AppState.chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        label: 'Результат',
-        data: [],
-        borderColor: '#4299e1',
-        backgroundColor: 'rgba(66, 153, 225, 0.1)',
-        fill: true,
-        tension: 0.4
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              return context.parsed.y.toFixed(2) + ' €';
-            }
-          }
-        }
-      },
-      scales: {
-        x: { grid: { display: false } },
-        y: { grid: { color: 'rgba(0,0,0,0.05)' } }
-      }
-    }
-  });
-  
-  updateChart();
+
+function parseDateTime(dateStr) {
+    var parts = dateStr.split(' ');
+    var datePart = parts[0];
+    var timePart = parts[1];
+
+    var dateParts = datePart.split('-').map(Number);
+    var timeParts = timePart.split(':').map(Number);
+
+    return new Date(dateParts[2], dateParts[0] - 1, dateParts[1], timeParts[0], timeParts[1], timeParts[2]);
 }
 
-function updateChart() {
-  if (!AppState.chart) return;
-  
-  const hands = AppState.dataManager.hands;
-  const filteredHands = filterHands(hands);
-  
-  if (filteredHands.length === 0) {
-    AppState.chart.data.labels = [];
-    AppState.chart.data.datasets[0].data = [];
-    AppState.chart.update();
-    return;
-  }
-  
-  if (AppState.currentView === 'hands') {
-    updateChartByHands(filteredHands);
-  } else {
-    updateChartByDays(filteredHands);
-  }
-}
-
-function filterHands(hands) {
-  let filtered = hands.slice();
-  
-  if (AppState.dateStart) {
-    const start = new Date(AppState.dateStart);
-    filtered = filtered.filter(function(h) {
-      return new Date(h.startDate) >= start;
-    });
-  }
-  
-  if (AppState.dateEnd) {
-    const end = new Date(AppState.dateEnd);
-    end.setHours(23, 59, 59);
-    filtered = filtered.filter(function(h) {
-      return new Date(h.startDate) <= end;
-    });
-  }
-  
-  const selectedLimits = document.getElementById('limitFilter').value;
-  if (selectedLimits && selectedLimits !== 'all') {
-    filtered = filtered.filter(function(h) {
-      return 'NL' + h.limit === selectedLimits;
-    });
-  }
-  
-  const hero = document.getElementById('playerSelect').value;
-  if (hero) {
-    const aliases = AppState.dataManager.aliases || [];
-    filtered = filtered.filter(function(h) {
-      return h.heroName === hero || aliases.indexOf(h.heroName) !== -1;
-    });
-  }
-  
-  return filtered;
-}
-
-function updateChartByHands(hands) {
-  const chunkSize = Math.max(1, Math.floor(hands.length / 10));
-  const labels = [];
-  const data = [];
-  let cumulative = 0;
-  
-  for (let i = 0; i < hands.length; i += chunkSize) {
-    const chunk = hands.slice(i, i + chunkSize);
-    const chunkResult = chunk.reduce(function(sum, h) {
-      return sum + h.result;
-    }, 0);
-    cumulative += chunkResult;
-    
-    labels.push('#' + (i + 1));
-    data.push(cumulative);
-  }
-  
-  AppState.chart.data.labels = labels;
-  AppState.chart.data.datasets[0].data = data;
-  AppState.chart.update();
-}
-
-function updateChartByDays(hands) {
-  const days = {};
-  
-  for (const hand of hands) {
-    const dayKey = hand.startDate.toISOString().split('T')[0];
-    if (!days[dayKey]) {
-      days[dayKey] = { result: 0, count: 0 };
-    }
-    days[dayKey].result += hand.result;
-    days[dayKey].count++;
-  }
-  
-  const sortedDays = Object.keys(days).sort();
-  const labels = sortedDays.map(function(d) {
-    return formatDate(d);
-  });
-  const data = sortedDays.map(function(d) {
-    return days[d].result;
-  });
-  
-  AppState.chart.data.labels = labels;
-  AppState.chart.data.datasets[0].data = data;
-  AppState.chart.update();
-}
-
-// ============================================================
-// Валюты
-// ============================================================
-function getCurrencySymbol() {
-  const mode = AppState.widgetModes.result;
-  const symbols = {
-    eur: '€',
-    usd: '$',
-    rub: '₽'
-  };
-  return symbols[mode] || '€';
-}
-
-function saveCurrencyRates() {
-  const rates = {
-    USD: parseFloat(document.getElementById('usdRate').value) || 1.10,
-    EUR: parseFloat(document.getElementById('eurRate').value) || 1.00,
-    RUB: parseFloat(document.getElementById('rubRate').value) || 90.00
-  };
-  
-  AppState.dataManager.updateSettings({ currencyRates: rates });
-}
-
-async function fetchExchangeRates() {
-  const btn = document.getElementById('updateRatesBtn');
-  btn.textContent = 'Загрузка...';
-  btn.disabled = true;
-  
-  try {
-    const response = await fetch('https://www.cbr-xml-daily.ru/daily_json.js');
-    const data = await response.json();
-    
-    if (data.Valute) {
-      const usd = data.Valute.USD?.Value || 1.10;
-      const eur = data.Valute.EUR?.Value || 1.00;
-      
-      document.getElementById('usdRate').value = (usd / eur).toFixed(4);
-      document.getElementById('eurRate').value = 1.00;
-      document.getElementById('rubRate').value = (eur * 100).toFixed(2);
-      
-      saveCurrencyRates();
-      showNotification('✅ Курсы валют обновлены', 'success');
-    }
-  } catch (error) {
-    console.error('Error fetching rates:', error);
-    showNotification('❌ Ошибка получения курсов', 'error');
-  } finally {
-    btn.textContent = 'Обновить курсы';
-    btn.disabled = false;
-  }
-}
-
-// ============================================================
-// Утилиты (из time.js)
-// ============================================================
 function formatTime(seconds) {
-  if (seconds < 0) return '0:00';
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  if (hours > 0) {
-    return hours + ':' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-  }
-  return minutes + ':' + String(secs).padStart(2, '0');
+    if (seconds < 0) return '0:00';
+
+    var hours = Math.floor(seconds / 3600);
+    var minutes = Math.floor((seconds % 3600) / 60);
+    var secs = Math.floor(seconds % 60);
+
+    if (hours > 0) {
+        return hours + ':' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+    return minutes + ':' + String(secs).padStart(2, '0');
 }
 
 function formatMinutes(seconds) {
-  const minutes = seconds / 60;
-  return Math.round(minutes * 10) / 10 + ' мин';
+    var minutes = seconds / 60;
+    return Math.round(minutes * 10) / 10 + ' мин';
 }
 
+// ============================================================
+// ПАРСЕР XML
+// ============================================================
+
+function parseXMLFile(xmlString, heroNick) {
+    var parser = new DOMParser();
+    var xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+
+    var parseError = xmlDoc.querySelector('parsererror');
+    if (parseError) {
+        console.error('XML parsing error:', parseError.textContent);
+        return null;
+    }
+
+    var gameNodes = xmlDoc.querySelectorAll('game');
+    var hands = [];
+
+    for (var i = 0; i < gameNodes.length; i++) {
+        var hand = parseGame(gameNodes[i], heroNick);
+        if (hand) {
+            hands.push(hand);
+        }
+    }
+
+    return hands;
+}
+
+function parseGame(gameNode, heroNick) {
+    var gamecode = gameNode.getAttribute('gamecode');
+    if (!gamecode) return null;
+
+    var generalNode = gameNode.querySelector('general');
+    if (!generalNode) return null;
+
+    var startDate = generalNode.querySelector('startdate')?.textContent;
+    if (!startDate) return null;
+
+    var playersNode = generalNode.querySelector('players');
+    if (!playersNode) return null;
+
+    var playerNodes = playersNode.querySelectorAll('player');
+    var players = [];
+    var heroPlayer = null;
+    var heroIndex = -1;
+    var win = 0;
+
+    for (var i = 0; i < playerNodes.length; i++) {
+        var node = playerNodes[i];
+        var name = node.getAttribute('name');
+        var chips = parseFloat(node.getAttribute('chips') || 0);
+        var playerWin = parseFloat(node.getAttribute('win') || 0);
+        var bet = parseFloat(node.getAttribute('bet') || 0);
+
+        var player = {
+            name: name,
+            chips: chips,
+            win: playerWin,
+            bet: bet,
+            seat: parseInt(node.getAttribute('seat') || 0),
+            isHero: name === heroNick
+        };
+
+        players.push(player);
+
+        if (player.isHero) {
+            heroPlayer = player;
+            heroIndex = i;
+            win = playerWin;
+        }
+    }
+
+    if (!heroPlayer) return null;
+
+    var bigBlind = 0;
+    var round0 = gameNode.querySelector('round[no="0"]');
+    if (round0) {
+        var actions0 = round0.querySelectorAll('action');
+        for (var a = 0; a < actions0.length; a++) {
+            var action = actions0[a];
+            var type = parseInt(action.getAttribute('type'));
+            if (type === ACTION_TYPES.BB) {
+                bigBlind = parseFloat(action.getAttribute('sum') || 0);
+                break;
+            }
+        }
+    }
+
+    var pocketCardsNode = gameNode.querySelector('cards[type="Pocket"][player="' + heroNick + '"]');
+    var heroCards = null;
+    if (pocketCardsNode) {
+        var cardsText = pocketCardsNode.textContent.trim();
+        if (cardsText !== 'X X') {
+            heroCards = cardsText;
+        }
+    }
+
+    var actions = parseActions(gameNode, heroNick);
+    var totalInvested = calculateInvestment(actions);
+
+    var totalPlayers = players.length;
+    var heroPosition = getPosition(heroIndex, totalPlayers);
+
+    var wentToShowdown = false;
+    var riverNode = gameNode.querySelector('round[no="4"]');
+    if (riverNode) {
+        var heroActionsAfterRiver = riverNode.querySelectorAll('action[player="' + heroNick + '"]');
+        wentToShowdown = heroActionsAfterRiver.length > 0;
+    }
+
+    var result = win - totalInvested;
+
+    return {
+        gamecode: gamecode,
+        startDate: parseDateTime(startDate),
+        heroName: heroNick,
+        heroCards: heroCards,
+        heroPosition: heroPosition,
+        totalPlayers: totalPlayers,
+        bigBlind: bigBlind,
+        limit: Math.round(bigBlind * 100),
+        totalInvested: totalInvested,
+        win: win,
+        result: result,
+        wentToShowdown: wentToShowdown,
+        actions: actions,
+        players: players.map(function(p) {
+            return {
+                name: p.name,
+                isHero: p.isHero,
+                seat: p.seat,
+                bet: p.bet,
+                win: p.win
+            };
+        })
+    };
+}
+
+function parseActions(gameNode, heroNick) {
+    var allActions = [];
+    var roundNodes = gameNode.querySelectorAll('round');
+
+    for (var r = 0; r < roundNodes.length; r++) {
+        var roundNode = roundNodes[r];
+        var roundNo = parseInt(roundNode.getAttribute('no') || 0);
+        var actions = roundNode.querySelectorAll('action');
+
+        for (var a = 0; a < actions.length; a++) {
+            var action = actions[a];
+            var player = action.getAttribute('player');
+            var type = parseInt(action.getAttribute('type') || 0);
+            var sum = parseFloat(action.getAttribute('sum') || 0);
+
+            allActions.push({
+                player: player,
+                type: type,
+                sum: sum,
+                round: roundNo,
+                isHero: player === heroNick
+            });
+        }
+    }
+
+    return allActions;
+}
+
+function calculateInvestment(actions) {
+    var totalInvested = 0;
+    var heroActions = actions.filter(function(a) { return a.isHero; });
+
+    for (var i = 0; i < heroActions.length; i++) {
+        var action = heroActions[i];
+        var type = action.type;
+        var sum = action.sum;
+
+        if (type === ACTION_TYPES.SB || type === ACTION_TYPES.BB) {
+            totalInvested += sum;
+            continue;
+        }
+
+        if (type === ACTION_TYPES.CALL || type === ACTION_TYPES.ALLIN) {
+            totalInvested += sum;
+            continue;
+        }
+
+        if (type === ACTION_TYPES.BET || type === ACTION_TYPES.RAISE) {
+            var currentRound = action.round;
+            var nextActions = actions.filter(function(a) {
+                return a.round === currentRound &&
+                    a.player !== action.player &&
+                    a.type !== ACTION_TYPES.FOLD;
+            });
+
+            if (nextActions.length > 0) {
+                totalInvested += sum;
+            }
+        }
+    }
+
+    return totalInvested;
+}
+
+// ============================================================
+// КАЛЬКУЛЯТОР СТАТИСТИКИ
+// ============================================================
+
+function StatsCalculator() {
+    this.reset();
+}
+
+StatsCalculator.prototype.reset = function() {
+    this.stats = {
+        totalHands: 0,
+        totalWon: 0,
+        totalLost: 0,
+        netResult: 0,
+        limits: {},
+        vpipHands: 0,
+        pfrHands: 0,
+        threeBetCount: 0,
+        threeBetOpportunities: 0,
+        foldToThreeBetCount: 0,
+        foldToThreeBetOpportunities: 0,
+        rfiCount: 0,
+        rfiOpportunities: 0,
+        callVsRfiCount: 0,
+        callVsRfiOpportunities: 0,
+        positions: {
+            EP: { hands: 0, vpip: 0, pfr: 0, threeBet: 0, foldToThreeBetCount: 0, foldToThreeBetOpportunities: 0,
+                rfi: 0, callVsRfi: 0, netResult: 0, threeBetOpportunities: 0 },
+            MP: { hands: 0, vpip: 0, pfr: 0, threeBet: 0, foldToThreeBetCount: 0, foldToThreeBetOpportunities: 0,
+                rfi: 0, callVsRfi: 0, netResult: 0, threeBetOpportunities: 0 },
+            CO: { hands: 0, vpip: 0, pfr: 0, threeBet: 0, foldToThreeBetCount: 0, foldToThreeBetOpportunities: 0,
+                rfi: 0, callVsRfi: 0, netResult: 0, threeBetOpportunities: 0 },
+            BTN: { hands: 0, vpip: 0, pfr: 0, threeBet: 0, foldToThreeBetCount: 0, foldToThreeBetOpportunities: 0,
+                rfi: 0, callVsRfi: 0, netResult: 0, threeBetOpportunities: 0 },
+            BLINDS: { hands: 0, vpip: 0, pfr: 0, threeBet: 0, foldToThreeBetCount: 0, foldToThreeBetOpportunities: 0,
+                rfi: 0, callVsRfi: 0, netResult: 0, threeBetOpportunities: 0 }
+        },
+        days: {},
+        handsByCards: {}
+    };
+};
+
+StatsCalculator.prototype.addHand = function(hand) {
+    var stats = this.stats;
+
+    stats.totalHands++;
+    if (hand.result > 0) stats.totalWon++;
+    if (hand.result < 0) stats.totalLost++;
+    stats.netResult += hand.result;
+
+    var limitKey = 'NL' + hand.limit;
+    if (!stats.limits[limitKey]) {
+        stats.limits[limitKey] = { hands: 0, netResult: 0 };
+    }
+    stats.limits[limitKey].hands++;
+    stats.limits[limitKey].netResult += hand.result;
+
+    var preflopActions = hand.actions.filter(function(a) {
+        return a.round === 0 && a.isHero;
+    });
+
+    var hasVoluntaryAction = preflopActions.some(function(a) {
+        return a.type === ACTION_TYPES.CALL ||
+            a.type === ACTION_TYPES.RAISE ||
+            a.type === ACTION_TYPES.BET;
+    });
+
+    if (hasVoluntaryAction) {
+        stats.vpipHands++;
+    }
+
+    var hasRaise = preflopActions.some(function(a) {
+        return a.type === ACTION_TYPES.RAISE;
+    });
+
+    if (hasRaise) {
+        stats.pfrHands++;
+    }
+
+    var preflopActionsBeforeHero = hand.actions.filter(function(a) {
+        return a.round === 0 &&
+            !a.isHero &&
+            (a.type === ACTION_TYPES.RAISE || a.type === ACTION_TYPES.BET);
+    });
+
+    if (hasRaise && preflopActionsBeforeHero.length === 0) {
+        stats.rfiCount++;
+    }
+    if (preflopActionsBeforeHero.length === 0) {
+        stats.rfiOpportunities++;
+    }
+
+    var enemyRaise = hand.actions.some(function(a) {
+        return a.round === 0 &&
+            !a.isHero &&
+            (a.type === ACTION_TYPES.RAISE || a.type === ACTION_TYPES.BET);
+    });
+
+    if (enemyRaise) {
+        stats.threeBetOpportunities++;
+        if (hasRaise) {
+            stats.threeBetCount++;
+        }
+    }
+
+    var hasFold = hand.actions.some(function(a) {
+        return a.round === 0 &&
+            a.isHero &&
+            a.type === ACTION_TYPES.FOLD;
+    });
+
+    if (hasFold && enemyRaise) {
+        stats.foldToThreeBetCount++;
+    }
+    if (enemyRaise) {
+        stats.foldToThreeBetOpportunities++;
+    }
+
+    var enemyRfi = hand.actions.some(function(a) {
+        return a.round === 0 &&
+            !a.isHero &&
+            (a.type === ACTION_TYPES.RAISE || a.type === ACTION_TYPES.BET) &&
+            hand.actions.filter(function(b) {
+                return b.round === 0 &&
+                    !b.isHero &&
+                    (b.type === ACTION_TYPES.RAISE || b.type === ACTION_TYPES.BET) &&
+                    b.sum < a.sum;
+            }).length === 0;
+    });
+
+    if (enemyRfi) {
+        stats.callVsRfiOpportunities++;
+        var hasCall = hand.actions.some(function(a) {
+            return a.round === 0 &&
+                a.isHero &&
+                a.type === ACTION_TYPES.CALL;
+        });
+        if (hasCall) {
+            stats.callVsRfiCount++;
+        }
+    }
+
+    var positionGroup = getPositionGroup(hand.heroPosition);
+    if (stats.positions[positionGroup]) {
+        var posStats = stats.positions[positionGroup];
+        posStats.hands++;
+        posStats.netResult += hand.result;
+
+        if (hasVoluntaryAction) posStats.vpip++;
+        if (hasRaise) posStats.pfr++;
+
+        if (enemyRaise) {
+            posStats.threeBetOpportunities = (posStats.threeBetOpportunities || 0) + 1;
+            if (hasRaise) posStats.threeBet++;
+        }
+
+        if (hasFold && enemyRaise) {
+            posStats.foldToThreeBetCount = (posStats.foldToThreeBetCount || 0) + 1;
+        }
+        if (enemyRaise) {
+            posStats.foldToThreeBetOpportunities = (posStats.foldToThreeBetOpportunities || 0) + 1;
+        }
+
+        if (hasRaise && preflopActionsBeforeHero.length === 0) {
+            posStats.rfi = (posStats.rfi || 0) + 1;
+        }
+
+        if (enemyRfi && hasCall) {
+            posStats.callVsRfi = (posStats.callVsRfi || 0) + 1;
+        }
+    }
+
+    if (hand.heroCards) {
+        var cardsKey = hand.heroCards;
+        if (!stats.handsByCards[cardsKey]) {
+            stats.handsByCards[cardsKey] = {
+                hands: 0,
+                netResult: 0,
+                vpip: 0,
+                pfr: 0,
+                threeBet: 0,
+                foldToThreeBet: 0,
+                rfi: 0,
+                callVsRfi: 0
+            };
+        }
+
+        var cardStats = stats.handsByCards[cardsKey];
+        cardStats.hands++;
+        cardStats.netResult += hand.result;
+        if (hasVoluntaryAction) cardStats.vpip++;
+        if (hasRaise) cardStats.pfr++;
+        if (enemyRaise && hasRaise) cardStats.threeBet++;
+        if (hasFold && enemyRaise) cardStats.foldToThreeBet++;
+        if (hasRaise && preflopActionsBeforeHero.length === 0) cardStats.rfi++;
+        if (enemyRfi && hasCall) cardStats.callVsRfi++;
+    }
+
+    var dayKey = hand.startDate.toISOString().split('T')[0];
+    if (!stats.days[dayKey]) {
+        stats.days[dayKey] = {
+            hands: [],
+            netResult: 0,
+            sessions: []
+        };
+    }
+    stats.days[dayKey].hands.push(hand);
+    stats.days[dayKey].netResult += hand.result;
+};
+
+StatsCalculator.prototype.getStats = function(breakMinutes) {
+    breakMinutes = breakMinutes || 5;
+    var stats = this.stats;
+
+    if (!stats) {
+        return {
+            totalHands: 0,
+            totalWon: 0,
+            totalLost: 0,
+            netResult: 0,
+            limits: {},
+            vpipHands: 0,
+            pfrHands: 0,
+            threeBetCount: 0,
+            threeBetOpportunities: 0,
+            foldToThreeBetCount: 0,
+            foldToThreeBetOpportunities: 0,
+            rfiCount: 0,
+            rfiOpportunities: 0,
+            callVsRfiCount: 0,
+            callVsRfiOpportunities: 0,
+            vpipPercent: 0,
+            pfrPercent: 0,
+            threeBetPercent: 0,
+            foldToThreeBetPercent: 0,
+            rfiPercent: 0,
+            callVsRfiPercent: 0,
+            averageLimit: 0,
+            favoriteLimit: 'NL0',
+            positions: {},
+            totalTime: 0,
+            topHands: [],
+            days: {}
+        };
+    }
+
+    var result = {
+        totalHands: stats.totalHands,
+        totalWon: stats.totalWon,
+        totalLost: stats.totalLost,
+        netResult: stats.netResult,
+        limits: stats.limits,
+        vpipHands: stats.vpipHands,
+        pfrHands: stats.pfrHands,
+        threeBetCount: stats.threeBetCount,
+        threeBetOpportunities: stats.threeBetOpportunities,
+        foldToThreeBetCount: stats.foldToThreeBetCount,
+        foldToThreeBetOpportunities: stats.foldToThreeBetOpportunities,
+        rfiCount: stats.rfiCount,
+        rfiOpportunities: stats.rfiOpportunities,
+        callVsRfiCount: stats.callVsRfiCount,
+        callVsRfiOpportunities: stats.callVsRfiOpportunities,
+        vpipPercent: stats.totalHands > 0 ? (stats.vpipHands / stats.totalHands * 100) : 0,
+        pfrPercent: stats.totalHands > 0 ? (stats.pfrHands / stats.totalHands * 100) : 0,
+        threeBetPercent: stats.threeBetOpportunities > 0 ? (stats.threeBetCount / stats.threeBetOpportunities *
+            100) : 0,
+        foldToThreeBetPercent: stats.foldToThreeBetOpportunities > 0 ? (stats.foldToThreeBetCount / stats
+            .foldToThreeBetOpportunities * 100) : 0,
+        rfiPercent: stats.rfiOpportunities > 0 ? (stats.rfiCount / stats.rfiOpportunities * 100) : 0,
+        callVsRfiPercent: stats.callVsRfiOpportunities > 0 ? (stats.callVsRfiCount / stats
+            .callVsRfiOpportunities * 100) : 0,
+        averageLimit: this.calculateAverageLimit(stats.limits),
+        favoriteLimit: this.calculateFavoriteLimit(stats.limits),
+        positions: this.calculatePositionStats(stats.positions),
+        totalTime: this.calculateTotalTime(stats.days, breakMinutes),
+        topHands: this.getTopHands(stats.handsByCards, 10),
+        days: stats.days
+    };
+
+    return result;
+};
+
+StatsCalculator.prototype.calculateAverageLimit = function(limits) {
+    var totalHands = 0;
+    var weightedSum = 0;
+
+    for (var limit in limits) {
+        var limitValue = parseInt(limit.replace('NL', ''));
+        totalHands += limits[limit].hands;
+        weightedSum += limitValue * limits[limit].hands;
+    }
+
+    return totalHands > 0 ? Math.round(weightedSum / totalHands) : 0;
+};
+
+StatsCalculator.prototype.calculateFavoriteLimit = function(limits) {
+    var favorite = null;
+    var maxHands = 0;
+
+    for (var limit in limits) {
+        if (limits[limit].hands > maxHands) {
+            maxHands = limits[limit].hands;
+            favorite = limit;
+        }
+    }
+
+    return favorite || 'NL0';
+};
+
+StatsCalculator.prototype.calculatePositionStats = function(positions) {
+    var result = {};
+
+    for (var pos in positions) {
+        var data = positions[pos];
+        if (data.hands === 0) {
+            result[pos] = {
+                hands: 0,
+                netResult: 0,
+                vpip: 0,
+                pfr: 0,
+                threeBet: 0,
+                foldToThreeBet: 0,
+                rfi: 0,
+                callVsRfi: 0
+            };
+            continue;
+        }
+
+        result[pos] = {
+            hands: data.hands,
+            netResult: data.netResult,
+            vpip: (data.vpip / data.hands) * 100,
+            pfr: (data.pfr / data.hands) * 100,
+            threeBet: data.threeBetOpportunities > 0 ? (data.threeBet / data.threeBetOpportunities) * 100 : 0,
+            foldToThreeBet: data.foldToThreeBetOpportunities > 0 ? (data.foldToThreeBetCount / data
+                .foldToThreeBetOpportunities) * 100 : 0,
+            rfi: data.hands > 0 ? ((data.rfi || 0) / data.hands) * 100 : 0,
+            callVsRfi: data.hands > 0 ? ((data.callVsRfi || 0) / data.hands) * 100 : 0
+        };
+    }
+
+    return result;
+};
+
+StatsCalculator.prototype.calculateTotalTime = function(days, breakMinutes) {
+    var totalSeconds = 0;
+
+    for (var dayKey in days) {
+        var dayData = days[dayKey];
+        var hands = dayData.hands;
+        if (hands.length === 0) continue;
+
+        var sortedHands = hands.slice().sort(function(a, b) {
+            return a.startDate - b.startDate;
+        });
+        var sessions = this.groupIntoSessions(sortedHands, breakMinutes);
+        dayData.sessions = sessions;
+
+        for (var s = 0; s < sessions.length; s++) {
+            totalSeconds += sessions[s].duration;
+        }
+    }
+
+    return totalSeconds;
+};
+
+StatsCalculator.prototype.groupIntoSessions = function(hands, breakMinutes) {
+    if (hands.length === 0) return [];
+
+    var sessions = [];
+    var currentSession = [hands[0]];
+    var breakMs = breakMinutes * 60 * 1000;
+
+    for (var i = 1; i < hands.length; i++) {
+        var prevHand = hands[i - 1];
+        var currentHand = hands[i];
+        var diff = currentHand.startDate - prevHand.startDate;
+
+        if (diff > breakMs) {
+            sessions.push({
+                hands: currentSession,
+                startTime: currentSession[0].startDate,
+                endTime: currentSession[currentSession.length - 1].startDate,
+                duration: (currentSession[currentSession.length - 1].startDate - currentSession[0]
+                    .startDate) / 1000,
+                netResult: currentSession.reduce(function(sum, h) { return sum + h.result; }, 0),
+                handsCount: currentSession.length
+            });
+            currentSession = [currentHand];
+        } else {
+            currentSession.push(currentHand);
+        }
+    }
+
+    if (currentSession.length > 0) {
+        sessions.push({
+            hands: currentSession,
+            startTime: currentSession[0].startDate,
+            endTime: currentSession[currentSession.length - 1].startDate,
+            duration: (currentSession[currentSession.length - 1].startDate - currentSession[0].startDate) /
+                1000,
+            netResult: currentSession.reduce(function(sum, h) { return sum + h.result; }, 0),
+            handsCount: currentSession.length
+        });
+    }
+
+    return sessions;
+};
+
+StatsCalculator.prototype.getTopHands = function(handsByCards, limit) {
+    limit = limit || 10;
+    var entries = Object.entries(handsByCards);
+    entries.sort(function(a, b) {
+        return b[1].hands - a[1].hands;
+    });
+    entries = entries.slice(0, limit);
+
+    return entries.map(function(entry) {
+        var cards = entry[0];
+        var data = entry[1];
+        return {
+            cards: cards,
+            hands: data.hands,
+            netResult: data.netResult,
+            vpipPercent: (data.vpip / data.hands) * 100,
+            pfrPercent: (data.pfr / data.hands) * 100
+        };
+    });
+};
+
+// ============================================================
+// DATA MANAGER
+// ============================================================
+
+function DataManager() {
+    this.hands = [];
+    this.stats = null;
+    this.settings = this.loadSettings();
+    this.heroNick = '';
+    this.aliases = [];
+    this.calculator = new StatsCalculator();
+}
+
+DataManager.prototype.loadSettings = function() {
+    try {
+        var saved = localStorage.getItem('pokerSettings');
+        if (saved) {
+            var settings = JSON.parse(saved);
+            return Object.assign({}, DEFAULT_SETTINGS, settings);
+        }
+    } catch (e) {
+        console.error('Error loading settings:', e);
+    }
+    return Object.assign({}, DEFAULT_SETTINGS);
+};
+
+DataManager.prototype.saveSettings = function() {
+    try {
+        localStorage.setItem('pokerSettings', JSON.stringify(this.settings));
+    } catch (e) {
+        console.error('Error saving settings:', e);
+    }
+};
+
+DataManager.prototype.loadHands = function() {
+    try {
+        var saved = localStorage.getItem('pokerHands');
+        if (saved) {
+            this.hands = JSON.parse(saved).map(function(h) {
+                return Object.assign({}, h, {
+                    startDate: new Date(h.startDate)
+                });
+            });
+
+            if (this.heroNick) {
+                this.recalculateStats();
+            }
+            return true;
+        }
+    } catch (e) {
+        console.error('Error loading hands:', e);
+    }
+    return false;
+};
+
+DataManager.prototype.saveHands = function() {
+    try {
+        localStorage.setItem('pokerHands', JSON.stringify(this.hands));
+    } catch (e) {
+        console.error('Error saving hands:', e);
+    }
+};
+
+DataManager.prototype.initAfterHeroSelection = function() {
+    if (this.heroNick && this.hands.length > 0) {
+        this.recalculateStats();
+    }
+};
+
+DataManager.prototype.addHands = function(newHands) {
+    var existingCodes = new Set(this.hands.map(function(h) { return h.gamecode; }));
+    var uniqueNewHands = newHands.filter(function(h) {
+        return !existingCodes.has(h.gamecode);
+    });
+
+    if (uniqueNewHands.length === 0) {
+        return { added: 0, duplicates: newHands.length };
+    }
+
+    this.hands = this.hands.concat(uniqueNewHands);
+    this.saveHands();
+
+    if (this.heroNick) {
+        this.recalculateStats();
+    }
+
+    return {
+        added: uniqueNewHands.length,
+        duplicates: newHands.length - uniqueNewHands.length
+    };
+};
+
+DataManager.prototype.recalculateStats = function() {
+    var self = this;
+    this.calculator.reset();
+
+    var heroHands = this.hands.filter(function(hand) {
+        var isHero = hand.heroName === self.heroNick;
+        var isAlias = self.aliases.some(function(alias) {
+            return hand.heroName === alias;
+        });
+        return isHero || isAlias;
+    });
+
+    heroHands.sort(function(a, b) {
+        return a.startDate - b.startDate;
+    });
+
+    for (var i = 0; i < heroHands.length; i++) {
+        this.calculator.addHand(heroHands[i]);
+    }
+
+    this.stats = this.calculator.getStats(this.settings?.sessionBreakMinutes || 5);
+};
+
+DataManager.prototype.getStats = function(filters) {
+    filters = filters || {};
+    if (!this.stats) {
+        this.recalculateStats();
+    }
+
+    var breakMinutes = this.settings?.sessionBreakMinutes || 5;
+    var stats = Object.assign({}, this.stats);
+
+    if (filters.limits && filters.limits.length > 0) {
+        var filteredHands = this.hands.filter(function(hand) {
+            var limit = 'NL' + hand.limit;
+            return filters.limits.indexOf(limit) !== -1;
+        });
+
+        var tempCalculator = new StatsCalculator();
+        for (var i = 0; i < filteredHands.length; i++) {
+            tempCalculator.addHand(filteredHands[i]);
+        }
+        stats = tempCalculator.getStats(breakMinutes);
+    }
+
+    if (filters.startDate && filters.endDate) {
+        var start = new Date(filters.startDate);
+        var end = new Date(filters.endDate);
+        var filteredHands = this.hands.filter(function(hand) {
+            var date = new Date(hand.startDate);
+            return date >= start && date <= end;
+        });
+
+        var tempCalculator = new StatsCalculator();
+        for (var i = 0; i < filteredHands.length; i++) {
+            tempCalculator.addHand(filteredHands[i]);
+        }
+        stats = tempCalculator.getStats(breakMinutes);
+    }
+
+    return stats;
+};
+
+DataManager.prototype.getDays = function(settings) {
+    settings = settings || {};
+    var dayStartHour = settings.dayStartHour || this.settings.dayStartHour;
+    var sessionBreak = settings.sessionBreakMinutes || this.settings.sessionBreakMinutes;
+
+    var self = this;
+    var heroHands = this.hands.filter(function(hand) {
+        var isHero = hand.heroName === self.heroNick;
+        var isAlias = self.aliases.some(function(alias) {
+            return hand.heroName === alias;
+        });
+        return isHero || isAlias;
+    });
+
+    var daysMap = {};
+
+    for (var i = 0; i < heroHands.length; i++) {
+        var hand = heroHands[i];
+        var date = new Date(hand.startDate);
+        var dayKey = this.getDayKey(date, dayStartHour);
+
+        if (!daysMap[dayKey]) {
+            daysMap[dayKey] = {
+                date: dayKey,
+                hands: [],
+                netResult: 0
+            };
+        }
+
+        daysMap[dayKey].hands.push(hand);
+        daysMap[dayKey].netResult += hand.result;
+    }
+
+    var result = [];
+    for (var dayKey in daysMap) {
+        var dayData = daysMap[dayKey];
+        var sortedHands = dayData.hands.slice().sort(function(a, b) {
+            return a.startDate - b.startDate;
+        });
+        var sessions = this.groupIntoSessions(sortedHands, sessionBreak);
+
+        result.push({
+            day: dayKey,
+            hands: sortedHands,
+            sessions: sessions,
+            netResult: dayData.netResult,
+            totalHands: sortedHands.length,
+            totalTime: sessions.reduce(function(sum, s) { return sum + s.duration; }, 0)
+        });
+    }
+
+    result.sort(function(a, b) {
+        return a.day.localeCompare(b.day);
+    });
+
+    return result;
+};
+
+DataManager.prototype.getDayKey = function(date, dayStartHour) {
+    var d = new Date(date);
+    var hours = d.getHours();
+    if (hours < dayStartHour) {
+        d.setDate(d.getDate() - 1);
+    }
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split('T')[0];
+};
+
+DataManager.prototype.groupIntoSessions = function(hands, breakMinutes) {
+    if (hands.length === 0) return [];
+
+    var sessions = [];
+    var currentSession = [hands[0]];
+    var breakMs = breakMinutes * 60 * 1000;
+
+    for (var i = 1; i < hands.length; i++) {
+        var prevHand = hands[i - 1];
+        var currentHand = hands[i];
+        var diff = currentHand.startDate - prevHand.startDate;
+
+        if (diff > breakMs) {
+            sessions.push({
+                hands: currentSession,
+                startTime: currentSession[0].startDate,
+                endTime: currentSession[currentSession.length - 1].startDate,
+                duration: (currentSession[currentSession.length - 1].startDate - currentSession[0]
+                    .startDate) / 1000,
+                netResult: currentSession.reduce(function(sum, h) { return sum + h.result; }, 0),
+                handsCount: currentSession.length
+            });
+            currentSession = [currentHand];
+        } else {
+            currentSession.push(currentHand);
+        }
+    }
+
+    if (currentSession.length > 0) {
+        sessions.push({
+            hands: currentSession,
+            startTime: currentSession[0].startDate,
+            endTime: currentSession[currentSession.length - 1].startDate,
+            duration: (currentSession[currentSession.length - 1].startDate - currentSession[0].startDate) /
+                1000,
+            netResult: currentSession.reduce(function(sum, h) { return sum + h.result; }, 0),
+            handsCount: currentSession.length
+        });
+    }
+
+    return sessions;
+};
+
+DataManager.prototype.clearAll = function() {
+    this.hands = [];
+    this.stats = null;
+    this.calculator.reset();
+    localStorage.removeItem('pokerHands');
+};
+
+DataManager.prototype.getAllNicks = function() {
+    var nicks = new Set();
+    for (var i = 0; i < this.hands.length; i++) {
+        var hand = this.hands[i];
+        for (var j = 0; j < hand.players.length; j++) {
+            nicks.add(hand.players[j].name);
+        }
+    }
+    return Array.from(nicks).sort();
+};
+
+DataManager.prototype.setHero = function(nick, aliases) {
+    aliases = aliases || [];
+    this.heroNick = nick;
+    this.aliases = aliases;
+    if (this.hands.length > 0) {
+        this.recalculateStats();
+    }
+};
+
+DataManager.prototype.updateSettings = function(settings) {
+    this.settings = Object.assign({}, this.settings, settings);
+    this.saveSettings();
+    if (this.heroNick && this.hands.length > 0) {
+        this.recalculateStats();
+    }
+};
+
+// ============================================================
+// ГЛАВНОЕ ПРИЛОЖЕНИЕ
+// ============================================================
+
+var AppState = {
+    currentView: 'hands',
+    dateStart: null,
+    dateEnd: null,
+    expandedDay: null,
+    widgetModes: {
+        limit: 'average',
+        hands: 'total',
+        time: 'hours',
+        result: 'eur'
+    },
+    theme: 'light',
+    isProcessing: false,
+    chart: null,
+    dataManager: null
+};
+
+function initApp() {
+    console.log('🚀 Poker Hand Analyzer starting...');
+
+    if (typeof Chart === 'undefined') {
+        showNotification('❌ Ошибка: Chart.js не загружен', 'error');
+        return;
+    }
+
+    if (typeof JSZip === 'undefined') {
+        showNotification('❌ Ошибка: JSZip не загружен', 'error');
+        return;
+    }
+
+    AppState.dataManager = new DataManager();
+    loadSettings();
+    AppState.dataManager.loadHands();
+    updatePlayerList();
+
+    if (AppState.dataManager.heroNick) {
+        document.getElementById('playerSelect').value = AppState.dataManager.heroNick;
+        AppState.dataManager.initAfterHeroSelection();
+    }
+
+    updateLimitFilter();
+    setupEvents();
+    updateUI();
+    initChart();
+
+    document.getElementById('currentYear').textContent = new Date().getFullYear();
+    console.log('✅ Poker Hand Analyzer initialized successfully!');
+}
+
+function loadSettings() {
+    var settings = AppState.dataManager.settings;
+
+    AppState.theme = settings.theme || 'light';
+    applyTheme(AppState.theme);
+
+    var dayStartHours = Math.floor(settings.dayStartHour);
+    var dayStartMinutes = (settings.dayStartHour % 1) * 60;
+    var dayStartEl = document.getElementById('dayStart');
+    if (dayStartEl) {
+        dayStartEl.value = String(dayStartHours).padStart(2, '0') + ':' + String(dayStartMinutes).padStart(2,
+        '0');
+    }
+
+    var sessionBreakEl = document.getElementById('sessionBreak');
+    if (sessionBreakEl) {
+        sessionBreakEl.value = settings.sessionBreakMinutes;
+    }
+
+    if (settings.currencyRates) {
+        var usdRate = document.getElementById('usdRate');
+        var eurRate = document.getElementById('eurRate');
+        var rubRate = document.getElementById('rubRate');
+        if (usdRate) usdRate.value = settings.currencyRates.USD || 1.10;
+        if (eurRate) eurRate.value = settings.currencyRates.EUR || 1.00;
+        if (rubRate) rubRate.value = settings.currencyRates.RUB || 90.00;
+    }
+
+    if (settings.widgetModes) {
+        AppState.widgetModes = settings.widgetModes;
+    }
+}
+
+function applyTheme(theme) {
+    AppState.theme = theme;
+    var app = document.getElementById('app');
+    if (app) {
+        app.className = 'app ' + theme + '-theme';
+    } else {
+        console.warn('⚠️ Element #app not found, theme not applied');
+    }
+}
+
+function updatePlayerList() {
+    var nicks = AppState.dataManager.getAllNicks();
+    var select = document.getElementById('playerSelect');
+    var currentValue = select.value;
+
+    select.innerHTML = '<option value="">Выберите игрока</option>';
+
+    for (var i = 0; i < nicks.length; i++) {
+        var option = document.createElement('option');
+        option.value = nicks[i];
+        option.textContent = nicks[i];
+        select.appendChild(option);
+    }
+
+    if (currentValue && nicks.indexOf(currentValue) !== -1) {
+        select.value = currentValue;
+    }
+}
+
+function updateLimitFilter() {
+    var select = document.getElementById('limitFilter');
+    var currentValue = select.value;
+
+    var limits = new Set();
+    for (var i = 0; i < AppState.dataManager.hands.length; i++) {
+        limits.add('NL' + AppState.dataManager.hands[i].limit);
+    }
+
+    select.innerHTML = '<option value="all">Все лимиты</option>';
+
+    for (var limit of limits) {
+        var option = document.createElement('option');
+        option.value = limit;
+        option.textContent = limit;
+        select.appendChild(option);
+    }
+
+    if (currentValue && limits.has(currentValue)) {
+        select.value = currentValue;
+    }
+}
+
+// ============================================================
+// СОБЫТИЯ
+// ============================================================
+
+function setupEvents() {
+    document.getElementById('playerSelect').addEventListener('change', function() {
+        var nick = this.value;
+        AppState.dataManager.setHero(nick, AppState.dataManager.aliases);
+        updateUI();
+        updateChart();
+    });
+
+    document.getElementById('aliasBtn').addEventListener('click', function() {
+        document.getElementById('aliasInput').value = (AppState.dataManager.aliases || []).join(', ');
+        openModal('aliasModal');
+    });
+
+    document.getElementById('saveAliases').addEventListener('click', function() {
+        var input = document.getElementById('aliasInput').value;
+        var aliases = input.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+        AppState.dataManager.aliases = aliases;
+        AppState.dataManager.recalculateStats();
+        updateUI();
+        updateChart();
+        closeModal('aliasModal');
+    });
+
+    document.getElementById('cancelAliases').addEventListener('click', function() {
+        closeModal('aliasModal');
+    });
+
+    document.getElementById('aliasModalClose').addEventListener('click', function() {
+        closeModal('aliasModal');
+    });
+
+    document.getElementById('importBtn').addEventListener('click', function() {
+        openModal('importModal');
+    });
+
+    document.getElementById('importModalClose').addEventListener('click', function() {
+        closeModal('importModal');
+    });
+
+    setupDropZone();
+
+    document.getElementById('selectFilesBtn').addEventListener('click', function() {
+        document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('selectFolderBtn').addEventListener('click', function() {
+        document.getElementById('folderInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        handleFiles(e.target.files);
+        this.value = '';
+    });
+
+    document.getElementById('folderInput').addEventListener('change', function(e) {
+        handleFiles(e.target.files);
+        this.value = '';
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', function() {
+        if (confirm('Вы уверены, что хотите удалить все данные?')) {
+            AppState.dataManager.clearAll();
+            updateUI();
+            updateChart();
+            updatePlayerList();
+            updateLimitFilter();
+            document.getElementById('playerSelect').value = '';
+        }
+    });
+
+    document.querySelectorAll('.widget').forEach(function(widget) {
+        widget.addEventListener('click', function() {
+            var type = this.dataset.widget;
+            toggleWidgetMode(type);
+        });
+    });
+
+    document.querySelectorAll('.chart-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.chart-btn').forEach(function(b) {
+                b.classList.remove('active');
+            });
+            this.classList.add('active');
+            AppState.currentView = this.dataset.mode;
+            updateChart();
+        });
+    });
+
+    document.getElementById('dateStart').addEventListener('change', function() {
+        AppState.dateStart = this.value;
+        updateChart();
+    });
+
+    document.getElementById('dateEnd').addEventListener('change', function() {
+        AppState.dateEnd = this.value;
+        updateChart();
+    });
+
+    document.getElementById('clearDateFilter').addEventListener('click', function() {
+        AppState.dateStart = null;
+        AppState.dateEnd = null;
+        document.getElementById('dateStart').value = '';
+        document.getElementById('dateEnd').value = '';
+        updateChart();
+    });
+
+    document.getElementById('dayStart').addEventListener('change', function() {
+        var parts = this.value.split(':').map(Number);
+        AppState.dataManager.updateSettings({
+            dayStartHour: parts[0] + parts[1] / 60
+        });
+        updateUI();
+        updateDayList();
+    });
+
+    document.getElementById('sessionBreak').addEventListener('change', function() {
+        var minutes = parseInt(this.value) || 5;
+        AppState.dataManager.updateSettings({
+            sessionBreakMinutes: minutes
+        });
+        updateDayList();
+    });
+
+    document.getElementById('updateRatesBtn').addEventListener('click', function() {
+        fetchExchangeRates();
+    });
+
+    document.getElementById('usdRate').addEventListener('change', saveCurrencyRates);
+    document.getElementById('eurRate').addEventListener('change', saveCurrencyRates);
+    document.getElementById('rubRate').addEventListener('change', saveCurrencyRates);
+
+    document.getElementById('overlay').addEventListener('click', function() {
+        closeAllModals();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeAllModals();
+        }
+    });
+}
+
+// ============================================================
+// DROP ZONE
+// ============================================================
+
+function setupDropZone() {
+    var zone = document.getElementById('dropZone');
+
+    ['dragenter', 'dragover'].forEach(function(event) {
+        zone.addEventListener(event, function(e) {
+            e.preventDefault();
+            zone.classList.add('drag-over');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(function(event) {
+        zone.addEventListener(event, function(e) {
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+        });
+    });
+
+    zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        var items = e.dataTransfer.items;
+        var files = [];
+        var totalItems = items.length;
+        var processed = 0;
+
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+
+            if (entry) {
+                if (entry.isDirectory) {
+                    traverseDirectory(entry, files, function() {
+                        processed++;
+                        if (processed === totalItems) {
+                            handleFiles(files);
+                        }
+                    });
+                } else if (entry.isFile) {
+                    entry.file(function(file) {
+                        files.push(file);
+                        processed++;
+                        if (processed === totalItems) {
+                            handleFiles(files);
+                        }
+                    });
+                }
+            } else {
+                var file = item.getAsFile();
+                if (file) {
+                    files.push(file);
+                }
+                processed++;
+                if (processed === totalItems) {
+                    handleFiles(files);
+                }
+            }
+        }
+
+        if (files.length > 0 && processed === totalItems) {
+            handleFiles(files);
+        }
+    });
+}
+
+function traverseDirectory(entry, files, callback) {
+    var reader = entry.createReader();
+
+    reader.readEntries(function(entries) {
+        var total = entries.length;
+        var processed = 0;
+
+        if (total === 0) {
+            callback();
+            return;
+        }
+
+        for (var i = 0; i < entries.length; i++) {
+            var childEntry = entries[i];
+            if (childEntry.isDirectory) {
+                traverseDirectory(childEntry, files, function() {
+                    processed++;
+                    if (processed === total) {
+                        callback();
+                    }
+                });
+            } else if (childEntry.isFile) {
+                childEntry.file(function(file) {
+                    files.push(file);
+                    processed++;
+                    if (processed === total) {
+                        callback();
+                    }
+                });
+            }
+        }
+    });
+}
+
+// ============================================================
+// ОБРАБОТКА ФАЙЛОВ
+// ============================================================
+
+async function handleFiles(fileList) {
+    if (AppState.isProcessing) {
+        showNotification('⏳ Идет обработка, подождите...', 'warning');
+        return;
+    }
+
+    AppState.isProcessing = true;
+    var files = Array.from(fileList);
+
+    var xmlFiles = [];
+    var archives = [];
+
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        var ext = file.name.split('.').pop().toLowerCase();
+        if (ext === 'xml') {
+            xmlFiles.push(file);
+        } else if (ext === 'zip' || ext === 'rar') {
+            archives.push(file);
+        }
+    }
+
+    if (xmlFiles.length === 0 && archives.length === 0) {
+        showNotification('Не найдено файлов для обработки (.xml, .zip, .rar)', 'warning');
+        AppState.isProcessing = false;
+        return;
+    }
+
+    showProgress();
+    updateProgress('extracting', 'Распаковка архивов...', 0);
+
+    var extractedFiles = [];
+    var totalFiles = xmlFiles.length;
+
+    for (var a = 0; a < archives.length; a++) {
+        try {
+            var extracted = await extractArchive(archives[a]);
+            extractedFiles = extractedFiles.concat(extracted);
+            totalFiles += extracted.length;
+        } catch (error) {
+            console.error('Error extracting archive:', error);
+            showNotification('Ошибка распаковки: ' + archives[a].name, 'error');
+        }
+    }
+
+    var allFiles = xmlFiles.concat(extractedFiles);
+    updateProgress('parsing', 'Обработка файлов...', 0, allFiles.length);
+
+    var allHands = [];
+    var processed = 0;
+
+    for (var f = 0; f < allFiles.length; f++) {
+        var file = allFiles[f];
+        try {
+            var content = await file.text();
+            var hands = parseXMLFile(content, AppState.dataManager.heroNick);
+            if (hands && hands.length > 0) {
+                allHands = allHands.concat(hands);
+            }
+        } catch (error) {
+            console.error('Error parsing file:', file.name, error);
+        }
+
+        processed++;
+        var progress = (processed / allFiles.length) * 100;
+        updateProgress('parsing', 'Обработка файлов...', progress, allFiles.length, processed);
+    }
+
+    updateProgress('saving', 'Сохранение данных...', 100);
+
+    var result = AppState.dataManager.addHands(allHands);
+    document.getElementById('totalHandsFound').textContent = allHands.length;
+    document.getElementById('newHandsAdded').textContent = result.added;
+    document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
+
+    hideProgress();
+    AppState.isProcessing = false;
+
+    if (result.added > 0) {
+        showNotification('✅ Добавлено ' + result.added + ' новых рук (' + result.duplicates + ' пропущено дублей)', 'success');
+        
+        // Обновляем список игроков
+        updatePlayerList();
+        // Если игрок еще не выбран, подсказываем
+        if (!AppState.dataManager.heroNick) {
+            showNotification('👤 Выберите игрока из списка', 'info');
+        }
+        
+        updateUI();
+        updateChart();
+        updateLimitFilter();
+    } else {
+        showNotification('ℹ️ Новых рук не найдено (' + result.duplicates + ' уже загружены)', 'info');
+    }
+
+    closeModal('importModal');
+}
+
+async function extractArchive(file) {
+    try {
+        var zip = await JSZip.loadAsync(file);
+        var files = [];
+
+        for (var path in zip.files) {
+            var zipEntry = zip.files[path];
+            if (zipEntry.name.endsWith('.xml') && !zipEntry.dir) {
+                var content = await zipEntry.async('string');
+                var extractedFile = new File([content], zipEntry.name, { type: 'text/xml' });
+                files.push(extractedFile);
+            }
+        }
+
+        return files;
+    } catch (error) {
+        console.error('Error extracting archive:', error);
+        return [];
+    }
+}
+
+// ============================================================
+// ПРОГРЕСС-БАР
+// ============================================================
+
+function showProgress() {
+    document.getElementById('progressContainer').classList.remove('hidden');
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressPercentage').textContent = '0%';
+    document.getElementById('processedFiles').textContent = '0';
+    document.getElementById('totalFiles').textContent = '0';
+    document.getElementById('totalHandsFound').textContent = '0';
+    document.getElementById('newHandsAdded').textContent = '0';
+    document.getElementById('duplicateHandsSkipped').textContent = '0';
+}
+
+function updateProgress(stage, message, percent, total, processed) {
+    var stageMap = {
+        'extracting': '📦 Распаковка архивов...',
+        'parsing': '📄 Обработка файлов...',
+        'saving': '💾 Сохранение данных...'
+    };
+
+    document.getElementById('progressStage').textContent = message || stageMap[stage] || stage;
+    document.getElementById('progressFill').style.width = Math.min(percent, 100) + '%';
+    document.getElementById('progressPercentage').textContent = Math.round(Math.min(percent, 100)) + '%';
+
+    if (total > 0) {
+        document.getElementById('processedFiles').textContent = processed;
+        document.getElementById('totalFiles').textContent = total;
+    }
+}
+
+function hideProgress() {
+    document.getElementById('progressContainer').classList.add('hidden');
+    document.getElementById('progressFill').style.width = '0%';
+}
+
+// ============================================================
+// МОДАЛКИ
+// ============================================================
+
+function openModal(id) {
+    document.getElementById('overlay').classList.remove('hidden');
+    document.getElementById(id).classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.add('hidden');
+    document.getElementById('overlay').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function closeAllModals() {
+    document.querySelectorAll('.modal').forEach(function(m) {
+        m.classList.add('hidden');
+    });
+    document.getElementById('overlay').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+// ============================================================
+// UI ОБНОВЛЕНИЕ
+// ============================================================
+
+function updateUI() {
+    var stats = AppState.dataManager.getStats();
+    updateWidgets(stats);
+    updateDayList();
+}
+
+function updateWidgets(stats) {
+    var widgets = AppState.widgetModes;
+    var currencySymbol = getCurrencySymbol();
+
+    if (widgets.limit === 'average') {
+        document.getElementById('avgLimit').textContent = 'NL' + (stats.averageLimit || 0);
+    } else {
+        document.getElementById('avgLimit').textContent = stats.favoriteLimit || 'NL0';
+    }
+    document.getElementById('favoriteLimit').textContent = 'Любимый: ' + (stats.favoriteLimit || 'NL0');
+
+    var totalHands = stats.totalHands || 0;
+    document.getElementById('totalHands').textContent = totalHands;
+
+    if (widgets.hands === 'total') {
+        document.getElementById('handsPerHour').textContent = totalHands + ' всего';
+    } else if (widgets.hands === 'perHour') {
+        var hours = (stats.totalTime || 0) / 3600;
+        var perHour = hours > 0 ? Math.round(totalHands / hours) : 0;
+        document.getElementById('handsPerHour').textContent = perHour + '/час';
+    } else {
+        var days = Object.keys(stats.days || {}).length || 1;
+        var perDay = Math.round(totalHands / days);
+        document.getElementById('handsPerHour').textContent = perDay + '/день';
+    }
+
+    if (widgets.time === 'hours') {
+        document.getElementById('totalTime').textContent = formatTime(stats.totalTime || 0);
+    } else {
+        document.getElementById('totalTime').textContent = formatMinutes(stats.totalTime || 0);
+    }
+    document.getElementById('totalTimeMinutes').textContent = formatMinutes(stats.totalTime || 0);
+
+    var result = stats.netResult || 0;
+    document.getElementById('netResult').textContent = currencySymbol + result.toFixed(2);
+    document.getElementById('netResult').className = 'widget-value ' + (result >= 0 ? 'positive' : 'negative');
+
+    var wonHands = stats.totalWon || 0;
+    document.getElementById('resultDetails').textContent = wonHands + ' рук выиграно';
+}
+
+function updateDayList() {
+    var days = AppState.dataManager.getDays({
+        dayStartHour: AppState.dataManager.settings.dayStartHour,
+        sessionBreakMinutes: AppState.dataManager.settings.sessionBreakMinutes
+    });
+
+    var container = document.getElementById('dayList');
+    var currencySymbol = getCurrencySymbol();
+
+    if (days.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет данных для отображения</div>';
+        return;
+    }
+
+    var html = '';
+
+    for (var i = 0; i < days.length; i++) {
+        var day = days[i];
+        var isExpanded = AppState.expandedDay === day.day;
+        var resultClass = day.netResult >= 0 ? 'positive' : 'negative';
+
+        html += '<div class="day-item">';
+        html += '<div class="day-header" data-day="' + day.day + '">';
+        html += '<span class="day-date">' + formatDate(day.day) + '</span>';
+        html += '<div class="day-stats">';
+        html += '<span class="hands-count">' + day.totalHands + ' рук</span>';
+        html += '<span class="time">' + formatTime(day.totalTime) + '</span>';
+        html += '<span class="result ' + resultClass + '">' + currencySymbol + day.netResult.toFixed(2) +
+            '</span>';
+        html += '</div></div>';
+
+        html += '<div class="day-sessions' + (isExpanded ? '' : ' hidden') + '" id="sessions-' + day.day + '">';
+
+        if (isExpanded) {
+            for (var s = 0; s < day.sessions.length; s++) {
+                var session = day.sessions[s];
+                var sessionClass = session.netResult >= 0 ? 'positive' : 'negative';
+                html += '<div class="session-item">';
+                html += '<span class="session-time">' + formatTimeSession(session.startTime, session
+                    .endTime) + '</span>';
+                html += '<span class="session-hands">' + session.handsCount + ' рук</span>';
+                html += '<span class="session-result ' + sessionClass + '">' + currencySymbol + session
+                    .netResult.toFixed(2) + '</span>';
+                html += '</div>';
+            }
+        }
+
+        html += '</div></div>';
+    }
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.day-header').forEach(function(header) {
+        header.addEventListener('click', function() {
+            var dayKey = this.dataset.day;
+            toggleDay(dayKey);
+        });
+    });
+}
+
+function toggleDay(dayKey) {
+    if (AppState.expandedDay === dayKey) {
+        AppState.expandedDay = null;
+    } else {
+        AppState.expandedDay = dayKey;
+    }
+    updateDayList();
+}
+
+// ============================================================
+// ВИДЖЕТЫ ПЕРЕКЛЮЧЕНИЕ
+// ============================================================
+
+function toggleWidgetMode(type) {
+    var modes = {
+        limit: ['average', 'favorite'],
+        hands: ['total', 'perHour', 'perDay'],
+        time: ['hours', 'minutes'],
+        result: ['eur', 'usd', 'rub']
+    };
+
+    var current = AppState.widgetModes[type];
+    var modeList = modes[type];
+    var currentIndex = modeList.indexOf(current);
+    var nextIndex = (currentIndex + 1) % modeList.length;
+    AppState.widgetModes[type] = modeList[nextIndex];
+
+    AppState.dataManager.updateSettings({ widgetModes: AppState.widgetModes });
+    updateUI();
+}
+
+// ============================================================
+// ГРАФИК
+// ============================================================
+
+function initChart() {
+    var ctx = document.getElementById('chartCanvas').getContext('2d');
+
+    AppState.chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Результат',
+                data: [],
+                borderColor: '#4299e1',
+                backgroundColor: 'rgba(66, 153, 225, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y.toFixed(2) + ' €';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(0,0,0,0.05)' } }
+            }
+        }
+    });
+
+    updateChart();
+}
+
+function updateChart() {
+    if (!AppState.chart) return;
+
+    var hands = AppState.dataManager.hands;
+    var filteredHands = filterHands(hands);
+
+    if (filteredHands.length === 0) {
+        AppState.chart.data.labels = [];
+        AppState.chart.data.datasets[0].data = [];
+        AppState.chart.update();
+        return;
+    }
+
+    if (AppState.currentView === 'hands') {
+        updateChartByHands(filteredHands);
+    } else {
+        updateChartByDays(filteredHands);
+    }
+}
+
+function filterHands(hands) {
+    var filtered = hands.slice();
+
+    if (AppState.dateStart) {
+        var start = new Date(AppState.dateStart);
+        filtered = filtered.filter(function(h) {
+            return new Date(h.startDate) >= start;
+        });
+    }
+
+    if (AppState.dateEnd) {
+        var end = new Date(AppState.dateEnd);
+        end.setHours(23, 59, 59);
+        filtered = filtered.filter(function(h) {
+            return new Date(h.startDate) <= end;
+        });
+    }
+
+    var selectedLimits = document.getElementById('limitFilter').value;
+    if (selectedLimits && selectedLimits !== 'all') {
+        filtered = filtered.filter(function(h) {
+            return 'NL' + h.limit === selectedLimits;
+        });
+    }
+
+    var hero = document.getElementById('playerSelect').value;
+    if (hero) {
+        var aliases = AppState.dataManager.aliases || [];
+        filtered = filtered.filter(function(h) {
+            return h.heroName === hero || aliases.indexOf(h.heroName) !== -1;
+        });
+    }
+
+    return filtered;
+}
+
+function updateChartByHands(hands) {
+    var chunkSize = Math.max(1, Math.floor(hands.length / 10));
+    var labels = [];
+    var data = [];
+    var cumulative = 0;
+
+    for (var i = 0; i < hands.length; i += chunkSize) {
+        var chunk = hands.slice(i, i + chunkSize);
+        var chunkResult = chunk.reduce(function(sum, h) {
+            return sum + h.result;
+        }, 0);
+        cumulative += chunkResult;
+
+        labels.push('#' + (i + 1));
+        data.push(cumulative);
+    }
+
+    AppState.chart.data.labels = labels;
+    AppState.chart.data.datasets[0].data = data;
+    AppState.chart.update();
+}
+
+function updateChartByDays(hands) {
+    var days = {};
+
+    for (var i = 0; i < hands.length; i++) {
+        var hand = hands[i];
+        var dayKey = hand.startDate.toISOString().split('T')[0];
+        if (!days[dayKey]) {
+            days[dayKey] = { result: 0, count: 0 };
+        }
+        days[dayKey].result += hand.result;
+        days[dayKey].count++;
+    }
+
+    var sortedDays = Object.keys(days).sort();
+    var labels = sortedDays.map(function(d) {
+        return formatDate(d);
+    });
+    var data = sortedDays.map(function(d) {
+        return days[d].result;
+    });
+
+    AppState.chart.data.labels = labels;
+    AppState.chart.data.datasets[0].data = data;
+    AppState.chart.update();
+}
+
+// ============================================================
+// ВАЛЮТЫ
+// ============================================================
+
+function getCurrencySymbol() {
+    var mode = AppState.widgetModes.result;
+    var symbols = {
+        eur: '€',
+        usd: '$',
+        rub: '₽'
+    };
+    return symbols[mode] || '€';
+}
+
+function saveCurrencyRates() {
+    var rates = {
+        USD: parseFloat(document.getElementById('usdRate').value) || 1.10,
+        EUR: parseFloat(document.getElementById('eurRate').value) || 1.00,
+        RUB: parseFloat(document.getElementById('rubRate').value) || 90.00
+    };
+
+    AppState.dataManager.updateSettings({ currencyRates: rates });
+}
+
+async function fetchExchangeRates() {
+    var btn = document.getElementById('updateRatesBtn');
+    btn.textContent = 'Загрузка...';
+    btn.disabled = true;
+
+    try {
+        var response = await fetch('https://www.cbr-xml-daily.ru/daily_json.js');
+        var data = await response.json();
+
+        if (data.Valute) {
+            var usd = data.Valute.USD?.Value || 1.10;
+            var eur = data.Valute.EUR?.Value || 1.00;
+
+            document.getElementById('usdRate').value = (usd / eur).toFixed(4);
+            document.getElementById('eurRate').value = 1.00;
+            document.getElementById('rubRate').value = (eur * 100).toFixed(2);
+
+            saveCurrencyRates();
+            showNotification('✅ Курсы валют обновлены', 'success');
+        }
+    } catch (error) {
+        console.error('Error fetching rates:', error);
+        showNotification('❌ Ошибка получения курсов', 'error');
+    } finally {
+        btn.textContent = 'Обновить курсы';
+        btn.disabled = false;
+    }
+}
+
+// ============================================================
+// УТИЛИТЫ
+// ============================================================
+
 function formatDate(dateStr) {
-  const date = new Date(dateStr);
-  const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
-  return date.toLocaleDateString('ru-RU', options);
+    var date = new Date(dateStr);
+    var options = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    return date.toLocaleDateString('ru-RU', options);
 }
 
 function formatTimeSession(start, end) {
-  const startStr = start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  const endStr = end.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  return startStr + ' - ' + endStr;
+    var startStr = start.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    var endStr = end.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return startStr + ' - ' + endStr;
 }
 
-// ============================================================
-// Уведомления
-// ============================================================
 function showNotification(message, type) {
-  type = type || 'info';
-  const colors = {
-    success: '#48bb78',
-    error: '#fc8181',
-    warning: '#ecc94b',
-    info: '#4299e1'
-  };
-  
-  const notification = document.createElement('div');
-  notification.style.cssText = 
-    'position:fixed;bottom:20px;right:20px;padding:12px 20px;' +
-    'background:' + (colors[type] || colors.info) + ';color:white;' +
-    'border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);' +
-    'z-index:2000;font-size:14px;max-width:400px;' +
-    'animation:bounceIn 0.3s ease;cursor:pointer;';
-  notification.textContent = message;
-  
-  document.body.appendChild(notification);
-  
-  setTimeout(function() {
-    notification.style.opacity = '0';
-    notification.style.transition = 'opacity 0.5s ease';
+    type = type || 'info';
+    var colors = {
+        success: '#48bb78',
+        error: '#fc8181',
+        warning: '#ecc94b',
+        info: '#4299e1'
+    };
+
+    var notification = document.createElement('div');
+    notification.style.cssText =
+        'position:fixed;bottom:20px;right:20px;padding:12px 20px;' +
+        'background:' + (colors[type] || colors.info) + ';color:white;' +
+        'border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);' +
+        'z-index:2000;font-size:14px;max-width:400px;' +
+        'animation:bounceIn 0.3s ease;cursor:pointer;';
+    notification.textContent = message;
+
+    document.body.appendChild(notification);
+
     setTimeout(function() {
-      notification.remove();
-    }, 500);
-  }, 3000);
-  
-  notification.addEventListener('click', function() {
-    notification.remove();
-  });
+        notification.style.opacity = '0';
+        notification.style.transition = 'opacity 0.5s ease';
+        setTimeout(function() {
+            notification.remove();
+        }, 500);
+    }, 3000);
+
+    notification.addEventListener('click', function() {
+        notification.remove();
+    });
 }
 
 // ============================================================
-// Запуск приложения
+// ЗАПУСК ПРИЛОЖЕНИЯ
 // ============================================================
-document.addEventListener('DOMContentLoaded', function() {
-  initApp();
-});
+
+// DOM уже загружен, так как скрипт находится в конце body
+initApp();
