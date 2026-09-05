@@ -10,7 +10,6 @@ function cleanSum(sumStr) {
         if (isNaN(sumStr)) return 0;
         return sumStr;
     }
-    // Удаляем символы валют, пробелы и запятые
     var cleaned = String(sumStr).replace(/[€$₽\s,]/g, '');
     var result = parseFloat(cleaned);
     return isNaN(result) ? 0 : result;
@@ -58,11 +57,9 @@ function parseGame(gameNode, heroNick) {
     var heroIndex = -1;
     var win = 0;
 
-    // Собираем информацию об игроках
     for (var i = 0; i < playerNodes.length; i++) {
         var node = playerNodes[i];
         var name = node.getAttribute('name');
-        // ИСПРАВЛЕНО: используем cleanSum для всех сумм
         var chips = cleanSum(node.getAttribute('chips'));
         var playerWin = cleanSum(node.getAttribute('win'));
         var bet = cleanSum(node.getAttribute('bet'));
@@ -85,7 +82,6 @@ function parseGame(gameNode, heroNick) {
         }
     }
 
-    // Если Hero не найден, пропускаем руку
     if (!heroPlayer) return null;
 
     // Поиск большого блайнда
@@ -96,7 +92,6 @@ function parseGame(gameNode, heroNick) {
         for (var a = 0; a < actions0.length; a++) {
             var action = actions0[a];
             var type = parseInt(action.getAttribute('type'));
-            // ИСПРАВЛЕНО: используем cleanSum
             if (type === 2) { // BB
                 bigBlind = cleanSum(action.getAttribute('sum'));
                 break;
@@ -104,7 +99,6 @@ function parseGame(gameNode, heroNick) {
         }
     }
 
-    // Парсим карты Hero
     var pocketCardsNode = gameNode.querySelector('cards[type="Pocket"][player="' + heroNick + '"]');
     var heroCards = null;
     if (pocketCardsNode) {
@@ -114,7 +108,6 @@ function parseGame(gameNode, heroNick) {
         }
     }
 
-    // Парсим действия Hero и считаем инвестиции
     var actions = parseActions(gameNode, heroNick);
     var totalInvested = calculateInvestment(actions);
 
@@ -128,7 +121,6 @@ function parseGame(gameNode, heroNick) {
         wentToShowdown = heroActionsAfterRiver.length > 0;
     }
 
-    // Результат
     var result = win - totalInvested;
 
     return {
@@ -170,7 +162,6 @@ function parseActions(gameNode, heroNick) {
             var action = actions[a];
             var player = action.getAttribute('player');
             var type = parseInt(action.getAttribute('type') || 0);
-            // ИСПРАВЛЕНО: используем cleanSum
             var sum = cleanSum(action.getAttribute('sum'));
 
             allActions.push({
@@ -193,22 +184,18 @@ function calculateInvestment(actions) {
     for (var i = 0; i < heroActions.length; i++) {
         var action = heroActions[i];
         var type = action.type;
-        // ИСПРАВЛЕНО: используем cleanSum
         var sum = cleanSum(action.sum);
 
-        // Блайнды всегда инвестиция
         if (type === ACTION_TYPES.SB || type === ACTION_TYPES.BB) {
             totalInvested += sum;
             continue;
         }
 
-        // Коллы и олл-ин всегда инвестиция
         if (type === ACTION_TYPES.CALL || type === ACTION_TYPES.ALLIN) {
             totalInvested += sum;
             continue;
         }
 
-        // Ставка или рейз - проверяем, были ли они уравнены
         if (type === ACTION_TYPES.BET || type === ACTION_TYPES.RAISE) {
             var currentRound = action.round;
             var nextActions = actions.filter(function(a) {
