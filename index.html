@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poker Hand Analyzer</title>
+  
+  <style>
+    /* ===== Базовые переменные ===== */
+    :root {
+      --transition-speed: 0.3s;
+    }
+
+    /* ===== Светлая тема (по умолчанию) ===== */
+    .light-theme {
+      --bg-primary: #f5f7fa;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-input: #f0f2f5;
+      --bg-hover: #e8eaed;
+      --bg-dropzone: #f0f4ff;
+      --bg-dropzone-hover: #e3ecff;
+      
+      --text-primary: #1a2332;
+      --text-secondary: #4a5568;
+      --text-muted: #718096;
+      --text-inverse: #ffffff;
+      
+      --border-color: #e2e8f0;
+      --border-active: #4299e1;
+      
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+      
+      --color-positive: #48bb78;
+      --color-positive-bg: #f0fff4;
+      --color-negative: #fc8181;
+      --color-negative-bg: #fff5f5;
+      --color-accent: #4299e1;
+      --color-accent-hover: #3182ce;
+      --color-warning: #ecc94b;
+      
+      --scrollbar-track: #f0f2f5;
+      --scrollbar-thumb: #cbd5e0;
+    }
+
+    /* ===== Темная тема ===== */
+    .dark-theme {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-card: #1c2333;
+      --bg-input: #2d3748;
+      --bg-hover: #2d3748;
+      --bg-dropzone: #1a2332;
+      --bg-dropzone-hover: #2d3748;
+      
+      --text-primary: #e2e8f0;
+      --text-secondary: #a0aec0;
+      --text-muted: #718096;
+      --text-inverse: #0d1117;
+      
+      --border-color: #2d3748;
+      --border-active: #4299e1;
+      
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
+      
+      --color-positive: #48bb78;
+      --color-positive-bg: #1a2e2a;
+      --color-negative: #fc8181;
+      --color-negative-bg: #2e1a1a;
+      --color-accent: #4299e1;
+      --color-accent-hover: #63b3ed;
+      --color-warning: #d69e2e;
+      
+      --scrollbar-track: #1a2332;
+      --scrollbar-thumb: #2d3748;
+    }
+
+    /* ===== Бежевая тема ===== */
+    .beige-theme {
+      --bg-primary: #f5efe6;
+      --bg-secondary: #faf6f0;
+      --bg-card: #fdfaf5;
+      --bg-input: #f0e8dc;
+      --bg-hover: #e8dfd0;
+      --bg-dropzone: #f5ede2;
+      --bg-dropzone-hover: #ede3d4;
+      
+      --text-primary: #3d2e1e;
+      --text-secondary: #6b5340;
+      --text-muted: #8a7560;
+      --text-inverse: #fdfaf5;
+      
+      --border-color: #d4c5b5;
+      --border-active: #a67c52;
+      
+      --shadow-sm: 0 1px 3px rgba(61,46,30,0.08);
+      --shadow-md: 0 4px 12px rgba(61,46,30,0.12);
+      --shadow-lg: 0 8px 24px rgba(61,46,30,0.16);
+      
+      --color-positive: #7a9e6d;
+      --color-positive-bg: #f0f5ec;
+      --color-negative: #c47a7a;
+      --color-negative-bg: #f5ecec;
+      --color-accent: #a67c52;
+      --color-accent-hover: #8a663e;
+      --color-warning: #c4a84a;
+      
+      --scrollbar-track: #ede3d4;
+      --scrollbar-thumb: #d4c5b5;
+    }
+
+    /* ===== Общие стили ===== */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: background var(--transition-speed), color var(--transition-speed);
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px;
+      background: var(--bg-primary);
+      transition: background var(--transition-speed);
+    }
+
+    /* ===== Скроллбар ===== */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    /* ===== Кнопки ===== */
+    .btn-primary {
+      background: var(--color-accent);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition-speed);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary:hover { background: var(--color-accent-hover); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+
+    .btn-secondary {
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all var(--transition-speed);
+    }
+    .btn-secondary:hover { background: var(--bg-hover); }
+
+    .btn-sm {
+      padding: 4px 12px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .btn-sm:hover { background: var(--bg-hover); }
+
+    .btn-icon {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all var(--transition-speed);
+    }
+    .btn-icon:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    /* ===== Селекты ===== */
+    .select {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all var(--transition-speed);
+      min-width: 120px;
+    }
+    .select:focus {
+      outline: none;
+      border-color: var(--border-active);
+      box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+    }
+    .select[multiple] {
+      min-height: 60px;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    /* ===== Инпуты ===== */
+    input[type="number"], input[type="time"], input[type="date"] {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+      transition: all var(--transition-speed);
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--border-active);
+      box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+    }
+
+    /* ===== Утилиты ===== */
+    .hidden { display: none !important; }
+    .positive { color: var(--color-positive); }
+    .negative { color: var(--color-negative); }
+
+    /* ===== Анимации ===== */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    @keyframes bounceIn {
+      0% { opacity: 0; transform: scale(0.8); }
+      60% { opacity: 1; transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    @keyframes slideDown {
+      from { opacity: 0; max-height: 0; transform: translateY(-10px); }
+      to { opacity: 1; max-height: 1000px; transform: translateY(0); }
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-text {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.5px;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .header-controls label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .player-selector {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* ===== Widgets ===== */
+    .widgets {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .widget {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: all var(--transition-speed);
+      border: 2px solid transparent;
+    }
+    .widget:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .widget:active { transform: scale(0.98); }
+    .widget.active { border-color: var(--color-accent); }
+
+    .widget-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .widget-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+
+    .widget-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* ===== Chart ===== */
+    .chart-section {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .chart-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chart-mode {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-input);
+      padding: 4px;
+      border-radius: 8px;
+    }
+
+    .chart-btn {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-speed);
+    }
+    .chart-btn:hover { color: var(--text-primary); }
+    .chart-btn.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .chart-period {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chart-container {
+      width: 100%;
+      height: 300px;
+      position: relative;
+    }
+
+    /* ===== Day List ===== */
+    .day-list {
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      padding: 8px 0;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .day-item {
+      border-bottom: 1px solid var(--border-color);
+    }
+    .day-item:last-child { border-bottom: none; }
+
+    .day-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: background var(--transition-speed);
+    }
+    .day-header:hover { background: var(--bg-hover); }
+
+    .day-date { font-weight: 600; font-size: 15px; }
+
+    .day-stats {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .day-stats .hands-count { font-weight: 500; }
+    .day-stats .result { font-weight: 600; }
+
+    .day-sessions {
+      background: var(--bg-primary);
+      padding: 0 16px 8px 16px;
+    }
+
+    .session-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: 6px;
+      margin: 4px 0;
+      background: var(--bg-card);
+      font-size: 13px;
+    }
+    .session-item:hover { background: var(--bg-hover); }
+
+    .session-time { color: var(--text-secondary); }
+    .session-hands { color: var(--text-muted); }
+    .session-result { font-weight: 600; }
+
+    .empty-state {
+      padding: 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* ===== Footer ===== */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--bg-secondary);
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .setting-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .setting-group label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+    .setting-group input[type="number"] { width: 60px; }
+    .setting-group input[type="time"] { width: 80px; }
+
+    .footer-center { display: flex; align-items: center; }
+
+    .currency-rates {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .currency-item {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: var(--bg-input);
+      padding: 2px 8px 2px 4px;
+      border-radius: 4px;
+    }
+    .currency-symbol {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .currency-input {
+      width: 60px;
+      padding: 2px 4px;
+      background: transparent;
+      border: none;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+    .currency-input:focus { outline: none; }
+
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .copyright {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .telegram-link {
+      color: var(--color-accent);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .telegram-link:hover { text-decoration: underline; }
+
+    /* ===== Modal ===== */
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background: var(--bg-secondary);
+      border-radius: 16px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .modal-header h3 { font-size: 18px; }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .modal-close:hover { color: var(--text-primary); }
+
+    .modal-body { padding: 20px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+    /* ===== Drop Zone ===== */
+    .drop-zone {
+      border: 2px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 40px 20px;
+      text-align: center;
+      transition: all var(--transition-speed);
+      background: var(--bg-dropzone);
+      cursor: pointer;
+    }
+    .drop-zone:hover {
+      border-color: var(--color-accent);
+      background: var(--bg-dropzone-hover);
+    }
+    .drop-zone.drag-over {
+      border-color: var(--color-accent);
+      background: var(--bg-dropzone-hover);
+      transform: scale(1.01);
+    }
+
+    .drop-zone-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .drop-zone-content svg { color: var(--text-muted); }
+    .drop-text { font-size: 16px; font-weight: 500; }
+    .drop-hint { font-size: 13px; color: var(--text-muted); }
+    .drop-actions { display: flex; gap: 10px; margin-top: 12px; }
+
+    /* ===== Progress ===== */
+    .progress-container {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--bg-input);
+      border-radius: 8px;
+    }
+
+    .progress-stage {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+
+    .progress-bar-wrapper { position: relative; }
+
+    .progress-bar {
+      width: 100%;
+      height: 24px;
+      background: var(--bg-primary);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-accent), var(--color-positive));
+      background-size: 200% 100%;
+      transition: width 0.5s ease;
+      border-radius: 12px;
+      animation: shimmer 2s infinite;
+    }
+
+    .progress-percentage {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .progress-details {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .progress-stats {
+      display: flex;
+      gap: 20px;
+      margin-top: 8px;
+      font-size: 13px;
+      flex-wrap: wrap;
+    }
+    .progress-stats span { color: var(--text-secondary); }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 1024px) {
+      .widgets { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .header { flex-direction: column; align-items: stretch; }
+      .header-left { flex-direction: column; align-items: stretch; }
+      .header-controls { flex-direction: column; align-items: stretch; }
+      .widgets { grid-template-columns: 1fr; }
+      .footer { flex-direction: column; align-items: stretch; }
+      .footer-left { flex-direction: column; align-items: stretch; }
+      .footer-center { justify-content: center; }
+      .footer-right { justify-content: center; }
+      .chart-controls { flex-direction: column; align-items: stretch; }
+      .chart-period { flex-wrap: wrap; }
+    }
+
+    @media (max-width: 480px) {
+      .app { padding: 8px; }
+      .widget-value { font-size: 22px; }
+    }
+  </style>
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <div id="app" class="app light-theme">
+    
+    <!-- Верхняя панель -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 32 32">
+            <rect x="2" y="2" width="28" height="28" rx="6" fill="#2c3e50" stroke="#e74c3c" stroke-width="2"/>
+            <text x="16" y="22" text-anchor="middle" font-size="16" font-weight="bold" fill="#e74c3c" font-family="Arial">♠</text>
+          </svg>
+          <span class="logo-text">PokerStats</span>
+        </div>
+        <div class="header-controls">
+          <div class="player-selector">
+            <label>Игрок:</label>
+            <select id="playerSelect" class="select">
+              <option value="">Выберите игрока</option>
+            </select>
+            <button id="aliasBtn" class="btn-icon" title="Алиасы (дополнительные ники)">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm0 2c-2.67 0-8 1.34-8 4v1h16v-1c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="limit-filter">
+            <label>Лимиты:</label>
+            <select id="limitFilter" class="select" multiple>
+              <option value="all">Все лимиты</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="header-right">
+        <button id="importBtn" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 1a1 1 0 011 1v6.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L7 8.586V2a1 1 0 011-1z"/>
+            <path d="M2 14a1 1 0 01-1-1v-1a1 1 0 011-1h12a1 1 0 011 1v1a1 1 0 01-1 1H2z"/>
+          </svg>
+          Импорт
+        </button>
+        <button id="resetBtn" class="btn-secondary">Сброс</button>
+      </div>
+    </header>
+
+    <!-- Виджеты -->
+    <section class="widgets">
+      <div class="widget" data-widget="limit">
+        <div class="widget-label">Средний лимит</div>
+        <div class="widget-value" id="avgLimit">NL0</div>
+        <div class="widget-sub" id="favoriteLimit">Любимый: NL0</div>
+      </div>
+      <div class="widget" data-widget="hands">
+        <div class="widget-label">Всего раздач</div>
+        <div class="widget-value" id="totalHands">0</div>
+        <div class="widget-sub" id="handsPerHour">0/час</div>
+      </div>
+      <div class="widget" data-widget="time">
+        <div class="widget-label">Время</div>
+        <div class="widget-value" id="totalTime">0:00</div>
+        <div class="widget-sub" id="totalTimeMinutes">0 мин</div>
+      </div>
+      <div class="widget" data-widget="result">
+        <div class="widget-label">Результат</div>
+        <div class="widget-value" id="netResult">€0.00</div>
+        <div class="widget-sub" id="resultDetails">0 рук выиграно</div>
+      </div>
+    </section>
+
+    <!-- График -->
+    <section class="chart-section">
+      <div class="chart-controls">
+        <div class="chart-mode">
+          <button class="chart-btn active" data-mode="hands">По раздачам</button>
+          <button class="chart-btn" data-mode="days">По дням</button>
+        </div>
+        <div class="chart-period">
+          <input type="date" id="dateStart" class="date-input" />
+          <span>—</span>
+          <input type="date" id="dateEnd" class="date-input" />
+          <button id="clearDateFilter" class="btn-sm">✕</button>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="chartCanvas"></canvas>
+      </div>
+    </section>
+
+    <!-- Список дней -->
+    <section id="dayList" class="day-list">
+      <div class="empty-state">Нет данных для отображения</div>
+    </section>
+
+    <!-- Нижняя панель -->
+    <footer class="footer">
+      <div class="footer-left">
+        <div class="setting-group">
+          <label>Начало дня:</label>
+          <input type="time" id="dayStart" value="06:00" step="60" />
+        </div>
+        <div class="setting-group">
+          <label>Разрыв сессий:</label>
+          <input type="number" id="sessionBreak" value="5" min="1" max="60" />
+          <span>мин</span>
+        </div>
+      </div>
+      <div class="footer-center">
+        <div class="currency-rates">
+          <div class="currency-item">
+            <span class="currency-symbol">$</span>
+            <input type="number" id="usdRate" step="0.01" value="1.10" class="currency-input" />
+          </div>
+          <div class="currency-item">
+            <span class="currency-symbol">€</span>
+            <input type="number" id="eurRate" step="0.01" value="1.00" class="currency-input" />
+          </div>
+          <div class="currency-item">
+            <span class="currency-symbol">₽</span>
+            <input type="number" id="rubRate" step="0.01" value="90.00" class="currency-input" />
+          </div>
+          <button id="updateRatesBtn" class="btn-sm">Обновить курсы</button>
+        </div>
+      </div>
+      <div class="footer-right">
+        <span class="copyright">© Butyrin <span id="currentYear">2026</span></span>
+        <a href="https://t.me/GGPKR" target="_blank" class="telegram-link">📱 Telegram</a>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Модальное окно для алиасов -->
+  <div id="aliasModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Алиасы (дополнительные ники)</h3>
+        <button class="modal-close" id="aliasModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Введите дополнительные ники через запятую:</p>
+        <textarea id="aliasInput" rows="3" placeholder="nick1, nick2, nick3"></textarea>
+        <div class="modal-actions">
+          <button id="saveAliases" class="btn-primary">Сохранить</button>
+          <button id="cancelAliases" class="btn-secondary">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно импорта -->
+  <div id="importModal" class="modal hidden">
+    <div class="modal-content import-modal">
+      <div class="modal-header">
+        <h3>Импорт раздач</h3>
+        <button class="modal-close" id="importModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="dropZone" class="drop-zone">
+          <div class="drop-zone-content">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="currentColor">
+              <path d="M24 4a2 2 0 012 2v13.172l4.586-4.586a2 2 0 012.828 2.828L27.657 24l5.757 5.757a2 2 0 01-2.828 2.828L26 26.828V40a2 2 0 01-4 0V26.828l-5.586 5.586a2 2 0 01-2.828-2.828L19.343 24 13.586 18.243a2 2 0 012.828-2.828L22 19.172V6a2 2 0 012-2z"/>
+            </svg>
+            <p class="drop-text">Перетащите файлы, папки или архивы сюда</p>
+            <p class="drop-hint">Поддерживаются .xml, .zip, .rar</p>
+            <div class="drop-actions">
+              <button id="selectFilesBtn" class="btn-primary">Выбрать файлы</button>
+              <button id="selectFolderBtn" class="btn-secondary">Выбрать папку</button>
+            </div>
+          </div>
+        </div>
+        
+        <div id="progressContainer" class="progress-container hidden">
+          <div class="progress-stage" id="progressStage">Подготовка...</div>
+          <div class="progress-bar-wrapper">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+              <span class="progress-percentage" id="progressPercentage">0%</span>
+            </div>
+          </div>
+          <div class="progress-details" id="progressDetails">
+            <span>Файлы: <span id="processedFiles">0</span> / <span id="totalFiles">0</span></span>
+          </div>
+          <div class="progress-stats">
+            <span>📊 Найдено рук: <span id="totalHandsFound">0</span></span>
+            <span>➕ Добавлено: <span id="newHandsAdded">0</span></span>
+            <span>⏭ Пропущено дублей: <span id="duplicateHandsSkipped">0</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Затемнение -->
+  <div id="overlay" class="overlay hidden"></div>
+
+  <!-- Скрытые инпуты -->
+  <input type="file" id="fileInput" accept=".xml,.zip,.rar" multiple style="display:none" />
+  <input type="file" id="folderInput" webkitdirectory multiple style="display:none" />
+
+  <script>
+    // ============================================================
+    // ВЕСЬ КОД ПРИЛОЖЕНИЯ ЗДЕСЬ (все функции из app.js и core файлов)
+    // ============================================================
+    
+    // ... сюда вставляем ВСЕ функции из:
+    // - constants.js
+    // - positions.js  
+    // - cards.js
+    // - time.js
+    // - xmlParser.js
+    // - statsCalculator.js
+    // - dataManager.js
+    // - app.js
+    
+    // И в конце запускаем:
+    document.addEventListener('DOMContentLoaded', function() {
+      initApp();
+    });
+  </script>
+</body>
+</html>
