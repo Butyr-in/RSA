@@ -3,11 +3,17 @@
 // Парсер XML
 // ============================================================
 
+// Функция очистки суммы от символов валют
+function cleanSum(sumStr) {
+    if (!sumStr) return 0;
+    if (typeof sumStr === 'number') return sumStr;
+    return parseFloat(String(sumStr).replace(/[€$₽\s,]/g, '')) || 0;
+}
+
 function parseXMLFile(xmlString, heroNick) {
   var parser = new DOMParser();
   var xmlDoc = parser.parseFromString(xmlString, 'text/xml');
   
-  // Проверяем ошибку парсинга
   var parseError = xmlDoc.querySelector('parsererror');
   if (parseError) {
     console.error('XML parsing error:', parseError.textContent);
@@ -45,15 +51,14 @@ function parseGame(gameNode, heroNick) {
   var heroPlayer = null;
   var heroIndex = -1;
   var win = 0;
-  var bet = cleanSum(node.getAttribute('bet'));
   
   // Собираем информацию об игроках
   for (var i = 0; i < playerNodes.length; i++) {
     var node = playerNodes[i];
     var name = node.getAttribute('name');
-    var chips = parseFloat(node.getAttribute('chips') || 0);
+    var chips = cleanSum(node.getAttribute('chips'));
     var playerWin = cleanSum(node.getAttribute('win'));
-    var bet = parseFloat(node.getAttribute('bet') || 0);
+    var bet = cleanSum(node.getAttribute('bet'));
     
     var player = {
       name: name,
@@ -73,28 +78,22 @@ function parseGame(gameNode, heroNick) {
     }
   }
   
-  // Если Hero не найден, пропускаем руку
   if (!heroPlayer) return null;
   
-  // Определяем лимит (по большому блайнду)
   // Поиск большого блайнда
-var bigBlind = 0;
-var round0 = gameNode.querySelector('round[no="0"]');
-if (round0) {
+  var bigBlind = 0;
+  var round0 = gameNode.querySelector('round[no="0"]');
+  if (round0) {
     var actions0 = round0.querySelectorAll('action');
     for (var a = 0; a < actions0.length; a++) {
-        var action = actions0[a];
-        var type = parseInt(action.getAttribute('type'));
-        var sumStr = action.getAttribute('sum') || '0';
-        var sum = parseFloat(sumStr.replace(/[€$₽]/g, ''));
-        
-        // type 2 = BB
-        if (type === 2) {
-            bigBlind = sum;
-            break;
-        }
+      var action = actions0[a];
+      var type = parseInt(action.getAttribute('type'));
+      if (type === 2) { // BB
+        bigBlind = cleanSum(action.getAttribute('sum'));
+        break;
+      }
     }
-}
+  }
   
   // Парсим карты Hero
   var pocketCardsNode = gameNode.querySelector('cards[type="Pocket"][player="' + heroNick + '"]');
@@ -110,11 +109,9 @@ if (round0) {
   var actions = parseActions(gameNode, heroNick);
   var totalInvested = calculateInvestment(actions);
   
-  // Определяем позицию
   var totalPlayers = players.length;
   var heroPosition = getPosition(heroIndex, totalPlayers);
   
-  // Проверяем, дошел ли Hero до вскрытия
   var wentToShowdown = false;
   var riverNode = gameNode.querySelector('round[no="4"]');
   if (riverNode) {
@@ -122,7 +119,6 @@ if (round0) {
     wentToShowdown = heroActionsAfterRiver.length > 0;
   }
   
-  // Результат
   var result = win - totalInvested;
   
   return {
@@ -164,7 +160,7 @@ function parseActions(gameNode, heroNick) {
       var action = actions[a];
       var player = action.getAttribute('player');
       var type = parseInt(action.getAttribute('type') || 0);
-      var sum = parseFloat(action.getAttribute('sum') || 0);
+      var sum = cleanSum(action.getAttribute('sum'));
       
       allActions.push({
         player: player,
@@ -186,21 +182,18 @@ function calculateInvestment(actions) {
   for (var i = 0; i < heroActions.length; i++) {
     var action = heroActions[i];
     var type = action.type;
-    var sum = action.sum;
+    var sum = cleanSum(action.sum);
     
-    // Блайнды всегда инвестиция
     if (type === ACTION_TYPES.SB || type === ACTION_TYPES.BB) {
       totalInvested += sum;
       continue;
     }
     
-    // Коллы и олл-ин всегда инвестиция
     if (type === ACTION_TYPES.CALL || type === ACTION_TYPES.ALLIN) {
       totalInvested += sum;
       continue;
     }
     
-    // Ставка или рейз - проверяем, были ли они уравнены
     if (type === ACTION_TYPES.BET || type === ACTION_TYPES.RAISE) {
       var currentRound = action.round;
       var nextActions = actions.filter(function(a) {
