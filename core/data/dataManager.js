@@ -296,11 +296,18 @@ class DataManager {
         stats = tempCalculator.getStats(breakMinutes);
     }
 
-    if (filters.limits && filters.limits.length > 0) {
-        const filteredHands = this.hands.filter(hand => {
-            const limit = 'NL' + hand.limit;
-            return filters.limits.includes(limit);
-        });
+    // ВСЕГДА фильтруем по лимитам
+    if (filters.limits) {
+        let filteredHands = this.hands;
+        
+        if (filters.limits.length === 0) {
+            filteredHands = [];  // Если ничего не выбрано - не показываем ничего
+        } else {
+            filteredHands = this.hands.filter(hand => {
+                const limit = 'NL' + hand.limit;
+                return filters.limits.includes(limit);
+            });
+        }
 
         const tempCalculator = new StatsCalculator();
         for (const hand of filteredHands) {
@@ -344,8 +351,21 @@ class DataManager {
     getDays(settings = {}) {
     const dayStartHour = settings.dayStartHour || this.settings.dayStartHour;
     const sessionBreak = settings.sessionBreakMinutes || this.settings.sessionBreakMinutes;
+    const selectedLimits = settings.limits;
 
     const heroHands = this.hands.filter(hand => {
+        // Фильтруем по лимитам
+        if (selectedLimits === null) {
+            // "Все" выбрано - показываем все
+        } else if (selectedLimits.length === 0) {
+            // Ничего не выбрано - пусто
+            return false;
+        } else {
+            if (!selectedLimits.includes('NL' + hand.limit)) {
+                return false;
+            }
+        }
+        
         return hand.players && hand.players.some(p => p.name === this.heroNick || this.aliases.includes(p.name));
     });
 
@@ -381,7 +401,6 @@ class DataManager {
         const sortedHands = dayData.hands.slice().sort((a, b) => a.startDate - b.startDate);
         const sessions = this.groupIntoSessions(sortedHands, sessionBreak);
         
-        // ✅ ВОТ ЗДЕСЬ:
         const dayStartTime = sortedHands[0].startDate;
         const dayEndTime = sortedHands[sortedHands.length - 1].startDate;
 

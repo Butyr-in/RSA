@@ -397,7 +397,7 @@ if (progressStats) {
             dayStartHour: parts[0] + parts[1] / 60
         });
         updateUI();
-        updateDayList();
+        updateDayList(getSelectedLimits());
     });
 
     document.getElementById('sessionBreak').addEventListener('change', function() {
@@ -406,7 +406,7 @@ if (progressStats) {
             sessionBreakMinutes: minutes
         });
         updateUI();
-        updateDayList();
+        updateDayList(getSelectedLimits());
     });
 
     document.getElementById('timezoneOffset').addEventListener('change', function() {
@@ -414,7 +414,7 @@ if (progressStats) {
     AppState.dataManager.updateSettings({ timezoneOffset: offset });
     updateUI();
     updateChart();
-    updateDayList();
+    uupdateDayList(getSelectedLimits());
 });
 
     // Загружаем сохранённое значение
@@ -473,7 +473,7 @@ document.getElementById('clearDateFilter').addEventListener('click', function() 
     AppState.dateEnd = null;
     document.getElementById('dateRange').value = '';
     updateChart();
-    updateDayList();
+    updateDayList(getSelectedLimits());
     updateUI();
 });
 }
@@ -1158,7 +1158,7 @@ function toggleDay(dayKey) {
     } else {
         AppState.expandedDay = dayKey;
     }
-    updateDayList();
+    updateDayList(getSelectedLimits());
 }
 
 // ============================================================
@@ -1357,7 +1357,7 @@ function getSelectedLimits() {
     const allCheckbox = limitContainer.querySelector('input[value="all"]');
     
     if (allCheckbox.checked) {
-        return [];
+        return null;  // ← Изменено!
     }
     
     return Array.from(limitContainer.querySelectorAll('input[type="checkbox"]:checked'))
