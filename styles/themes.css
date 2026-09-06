@@ -1,0 +1,329 @@
+/* themes.css - Светлая, темная и бежевая темы */
+
+/* ===== Базовые переменные ===== */
+:root {
+    --transition-speed: 0.3s;
+    --font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ===== Светлая тема (по умолчанию) ===== */
+.light-theme {
+    --bg-primary: #f0f2f5;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-input: #f0f2f5;
+    --bg-hover: #e8eaed;
+    --bg-dropzone: #f0f4ff;
+    --bg-dropzone-hover: #e3ecff;
+    --text-primary: #1a2332;
+    --text-secondary: #4a5568;
+    --text-muted: #718096;
+    --text-inverse: #ffffff;
+    --border-color: #e2e8f0;
+    --border-active: #4299e1;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+    --color-positive: #2f855a;
+    --color-positive-bg: #f0fff4;
+    --color-negative: #c53030;
+    --color-negative-bg: #fff5f5;
+    --color-accent: #4299e1;
+    --color-accent-hover: #3182ce;
+    --color-warning: #ecc94b;
+    --scrollbar-track: #f0f2f5;
+    --scrollbar-thumb: #cbd5e0;
+}
+
+/* ===== Тёмная тема ===== */
+.dark-theme {
+    --bg-primary: #161b22;  /* Добавлено! */
+    --bg-secondary: #1c2333;
+    --bg-card: #1c2333;
+    --bg-input: #2d3748;
+    --bg-hover: #2d3748;
+    --bg-dropzone: #1a2332;
+    --bg-dropzone-hover: #2d3748;
+    --text-primary: #e2e8f0;
+    --text-secondary: #a0aec0;
+    --text-muted: #718096;
+    --text-inverse: #0d1117;
+    --border-color: #2d3748;
+    --border-active: #4299e1;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.6);
+    --color-positive: #48bb78;
+    --color-positive-bg: #1a2e2a;
+    --color-negative: #f56565;
+    --color-negative-bg: #2e1a1a;
+    --color-accent: #4299e1;
+    --color-accent-hover: #63b3ed;
+    --color-warning: #d69e2e;
+    --scrollbar-track: #1a2332;
+    --scrollbar-thumb: #2d3748;
+}
+
+/* ===== Бежевая тема ===== */
+.beige-theme {
+    --bg-primary: #f0e8dc;
+    --bg-secondary: #faf6f0;
+    --bg-card: #fdfaf5;
+    --bg-input: #f0e8dc;
+    --bg-hover: #e8dfd0;
+    --bg-dropzone: #f5ede2;
+    --bg-dropzone-hover: #ede3d4;
+    --text-primary: #3d2e1e;
+    --text-secondary: #6b5340;
+    --text-muted: #8a7560;
+    --text-inverse: #fdfaf5;
+    --border-color: #d4c5b5;
+    --border-active: #a67c52;
+    --shadow-sm: 0 1px 3px rgba(61,46,30,0.08);
+    --shadow-md: 0 4px 12px rgba(61,46,30,0.12);
+    --shadow-lg: 0 8px 24px rgba(61,46,30,0.16);
+    --color-positive: #4a7c3f;
+    --color-positive-bg: #f0f5ec;
+    --color-negative: #a04040;
+    --color-negative-bg: #f5ecec;
+    --color-accent: #a67c52;
+    --color-accent-hover: #8a663e;
+    --color-warning: #c4a84a;
+    --scrollbar-track: #ede3d4;
+    --scrollbar-thumb: #d4c5b5;
+}
+
+/* ===== Общие стили ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background var(--transition-speed), color var(--transition-speed);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.app {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px;
+    transition: background var(--transition-speed);
+}
+
+/* ===== Скроллбар ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ===== Кнопки ===== */
+.btn-primary {
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-speed);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-speed);
+}
+.btn-secondary:hover {
+  background: var(--bg-hover);
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-speed);
+}
+.btn-sm:hover {
+  background: var(--bg-hover);
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all var(--transition-speed);
+}
+.btn-icon:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ===== Селекты ===== */
+.select {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-speed);
+  min-width: 120px;
+}
+.select:focus {
+  outline: none;
+  border-color: var(--border-active);
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+}
+.select[multiple] {
+  min-height: 60px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+/* ===== Инпуты ===== */
+input[type="number"],
+input[type="time"],
+input[type="date"] {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  transition: all var(--transition-speed);
+}
+input:focus {
+  outline: none;
+  border-color: var(--border-active);
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+}
+
+/* ===== Утилиты ===== */
+.hidden {
+  display: none !important;
+}
+
+.positive {
+  color: var(--color-positive);
+}
+.negative {
+  color: var(--color-negative);
+}
+
+/* ===== Анимации ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===== Widget value colors ===== */
+.widget-value.positive {
+    color: var(--color-positive);
+}
+
+.widget-value.negative {
+    color: var(--color-negative);
+}
+
+/* ===== Шрифт ===== */
+body,
+button,
+input,
+select,
+textarea {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+}
+
+.logo-text {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+}
+
+.widget-value {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+}
+
+/* ===== Автоматическая адаптация цветов ===== */
+.app,
+.app * {
+    color: inherit;
+}
+
+.app {
+    color: var(--text-primary);
+}
+
+/* Специфичные элементы */
+.logo-text,
+.widget-value,
+.day-date,
+.modal-header h3,
+.drop-text {
+    color: var(--text-primary);
+}
+
+.widget-label,
+.widget-sub,
+.day-stats,
+.session-time,
+.session-hands,
+.copyright,
+.drop-hint {
+    color: var(--text-muted);
+}

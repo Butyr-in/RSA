@@ -10,26 +10,26 @@ function cleanSum(sumStr) {
         if (isNaN(sumStr)) return 0;
         return sumStr;
     }
-    var cleaned = String(sumStr).replace(/[€$₽\s,]/g, '');
-    var result = parseFloat(cleaned);
+    const cleaned = String(sumStr).replace(/[€$₽\s,]/g, '');
+    const result = parseFloat(cleaned);
     return isNaN(result) ? 0 : result;
 }
 
 function parseXMLFile(xmlString, heroNick) {
-    var parser = new DOMParser();
-    var xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
 
-    var parseError = xmlDoc.querySelector('parsererror');
+    const parseError = xmlDoc.querySelector('parsererror');
     if (parseError) {
         console.error('XML parsing error:', parseError.textContent);
         return null;
     }
 
-    var gameNodes = xmlDoc.querySelectorAll('game');
-    var hands = [];
+    const gameNodes = xmlDoc.querySelectorAll('game');
+    const hands = [];
 
-    for (var i = 0; i < gameNodes.length; i++) {
-        var hand = parseGame(gameNodes[i], heroNick);
+    for (let i = 0; i < gameNodes.length; i++) {
+        const hand = parseGame(gameNodes[i], heroNick);
         if (hand) {
             hands.push(hand);
         }
@@ -39,32 +39,32 @@ function parseXMLFile(xmlString, heroNick) {
 }
 
 function parseGame(gameNode, heroNick) {
-    var gamecode = gameNode.getAttribute('gamecode');
+    const gamecode = gameNode.getAttribute('gamecode');
     if (!gamecode) return null;
 
-    var generalNode = gameNode.querySelector('general');
+    const generalNode = gameNode.querySelector('general');
     if (!generalNode) return null;
 
-    var startDate = generalNode.querySelector('startdate')?.textContent;
+    const startDate = generalNode.querySelector('startdate')?.textContent;
     if (!startDate) return null;
 
-    var playersNode = generalNode.querySelector('players');
+    const playersNode = generalNode.querySelector('players');
     if (!playersNode) return null;
 
-    var playerNodes = playersNode.querySelectorAll('player');
-    var players = [];
-    var heroPlayer = null;
-    var heroIndex = -1;
-    var win = 0;
+    const playerNodes = playersNode.querySelectorAll('player');
+    const players = [];
+    let heroPlayer = null;
+    let heroIndex = -1;
+    let win = 0;
 
-    for (var i = 0; i < playerNodes.length; i++) {
-        var node = playerNodes[i];
-        var name = node.getAttribute('name');
-        var chips = cleanSum(node.getAttribute('chips'));
-        var playerWin = cleanSum(node.getAttribute('win'));
-        var bet = cleanSum(node.getAttribute('bet'));
+    for (let i = 0; i < playerNodes.length; i++) {
+        const node = playerNodes[i];
+        const name = node.getAttribute('name');
+        const chips = cleanSum(node.getAttribute('chips'));
+        const playerWin = cleanSum(node.getAttribute('win'));
+        const bet = cleanSum(node.getAttribute('bet'));
 
-        var player = {
+        const player = {
             name: name,
             chips: chips,
             win: playerWin,
@@ -85,43 +85,54 @@ function parseGame(gameNode, heroNick) {
     if (!heroPlayer) return null;
 
     // Поиск большого блайнда
-    var bigBlind = 0;
-    var round0 = gameNode.querySelector('round[no="0"]');
-    if (round0) {
-        var actions0 = round0.querySelectorAll('action');
-        for (var a = 0; a < actions0.length; a++) {
-            var action = actions0[a];
-            var type = parseInt(action.getAttribute('type'));
-            if (type === 2) { // BB
-                bigBlind = cleanSum(action.getAttribute('sum'));
-                break;
+    let bigBlind = 0;
+    
+    // Попытка найти BB в атрибуте general
+    const generalBB = generalNode.getAttribute('bb');
+    if (generalBB) {
+        bigBlind = cleanSum(generalBB);
+    } else {
+        // Если нет, ищем в round 0
+        const round0 = gameNode.querySelector('round[no="0"]');
+        if (round0) {
+            const actions0 = round0.querySelectorAll('action');
+            for (let a = 0; a < actions0.length; a++) {
+                const action = actions0[a];
+                const type = parseInt(action.getAttribute('type'));
+                const sum = cleanSum(action.getAttribute('sum'));
+                
+                // BB обычно ставится первым и его тип = 2 (BB)
+                if (type === ACTION_TYPES.BB) {
+                    bigBlind = sum;
+                    break;
+                }
             }
         }
     }
 
-    var pocketCardsNode = gameNode.querySelector('cards[type="Pocket"][player="' + heroNick + '"]');
-    var heroCards = null;
+    const pocketCardsNode = gameNode.querySelector('cards[type="Pocket"][player="' + heroNick + '"]');
+    let heroCards = null;
     if (pocketCardsNode) {
-        var cardsText = pocketCardsNode.textContent.trim();
+        const cardsText = pocketCardsNode.textContent.trim();
         if (cardsText !== 'X X') {
             heroCards = cardsText;
         }
     }
 
-    var actions = parseActions(gameNode, heroNick);
-    var totalInvested = calculateInvestment(actions);
+    const actions = parseActions(gameNode, heroNick);
+    const totalInvested = calculateInvestment(actions);
 
-    var totalPlayers = players.length;
-    var heroPosition = getPosition(heroIndex, totalPlayers);
+    const totalPlayers = players.length;
+    const heroPosition = getPosition(heroIndex, totalPlayers);
 
-    var wentToShowdown = false;
-    var riverNode = gameNode.querySelector('round[no="4"]');
+    let wentToShowdown = false;
+    const riverNode = gameNode.querySelector('round[no="4"]');
     if (riverNode) {
-        var heroActionsAfterRiver = riverNode.querySelectorAll('action[player="' + heroNick + '"]');
+        const heroActionsAfterRiver = riverNode.querySelectorAll('action[player="' + heroNick + '"]');
         wentToShowdown = heroActionsAfterRiver.length > 0;
     }
 
-    var result = win - totalInvested;
+    const result = win - totalInvested;
 
     return {
         gamecode: gamecode,
@@ -137,32 +148,30 @@ function parseGame(gameNode, heroNick) {
         result: result,
         wentToShowdown: wentToShowdown,
         actions: actions,
-        players: players.map(function(p) {
-            return {
-                name: p.name,
-                isHero: p.isHero,
-                seat: p.seat,
-                bet: p.bet,
-                win: p.win
-            };
-        })
+        players: players.map(p => ({
+            name: p.name,
+            isHero: p.isHero,
+            seat: p.seat,
+            bet: p.bet,
+            win: p.win
+        }))
     };
 }
 
 function parseActions(gameNode, heroNick) {
-    var allActions = [];
-    var roundNodes = gameNode.querySelectorAll('round');
+    const allActions = [];
+    const roundNodes = gameNode.querySelectorAll('round');
 
-    for (var r = 0; r < roundNodes.length; r++) {
-        var roundNode = roundNodes[r];
-        var roundNo = parseInt(roundNode.getAttribute('no') || 0);
-        var actions = roundNode.querySelectorAll('action');
+    for (let r = 0; r < roundNodes.length; r++) {
+        const roundNode = roundNodes[r];
+        const roundNo = parseInt(roundNode.getAttribute('no') || 0);
+        const actions = roundNode.querySelectorAll('action');
 
-        for (var a = 0; a < actions.length; a++) {
-            var action = actions[a];
-            var player = action.getAttribute('player');
-            var type = parseInt(action.getAttribute('type') || 0);
-            var sum = cleanSum(action.getAttribute('sum'));
+        for (let a = 0; a < actions.length; a++) {
+            const action = actions[a];
+            const player = action.getAttribute('player');
+            const type = parseInt(action.getAttribute('type') || 0);
+            const sum = cleanSum(action.getAttribute('sum'));
 
             allActions.push({
                 player: player,
@@ -178,13 +187,13 @@ function parseActions(gameNode, heroNick) {
 }
 
 function calculateInvestment(actions) {
-    var totalInvested = 0;
-    var heroActions = actions.filter(function(a) { return a.isHero; });
+    let totalInvested = 0;
+    const heroActions = actions.filter(a => a.isHero);
 
-    for (var i = 0; i < heroActions.length; i++) {
-        var action = heroActions[i];
-        var type = action.type;
-        var sum = cleanSum(action.sum);
+    for (let i = 0; i < heroActions.length; i++) {
+        const action = heroActions[i];
+        const type = action.type;
+        const sum = action.sum;
 
         if (type === ACTION_TYPES.SB || type === ACTION_TYPES.BB) {
             totalInvested += sum;
@@ -197,8 +206,8 @@ function calculateInvestment(actions) {
         }
 
         if (type === ACTION_TYPES.BET || type === ACTION_TYPES.RAISE) {
-            var currentRound = action.round;
-            var nextActions = actions.filter(function(a) {
+            const currentRound = action.round;
+            const nextActions = actions.filter(a => {
                 return a.round === currentRound &&
                     a.player !== action.player &&
                     a.type !== ACTION_TYPES.FOLD;
