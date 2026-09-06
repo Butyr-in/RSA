@@ -103,10 +103,8 @@ function loadSettings() {
 
     if (settings.currencyRates) {
         const usdRate = document.getElementById('usdRate');
-        const eurRate = document.getElementById('eurRate');
         const rubRate = document.getElementById('rubRate');
         if (usdRate) usdRate.value = settings.currencyRates.USD || 1.10;
-        if (eurRate) eurRate.value = settings.currencyRates.EUR || 1.00;
         if (rubRate) rubRate.value = settings.currencyRates.RUB || 90.00;
     }
 
@@ -157,17 +155,18 @@ function getThemeName(theme) {
 }
 
 // Обновление иконки темы
+// Обновление иконки темы
 function updateThemeIcon() {
     const btn = document.getElementById('themeToggle');
     if (!btn) return;
     
     const icons = {
-        light: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>',
-        dark: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>',
-        beige: '<svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4h12v12H4z"/><path d="M2 2h16v16H2z" fill="none" stroke="currentColor" stroke-width="2"/></svg>'
+        light: '☀️',
+        dark: '🌙',
+        beige: '💡'
     };
     
-    btn.innerHTML = icons[AppState.theme] || icons.light;
+    btn.textContent = icons[AppState.theme] || icons.light;
 }
 
 // Обновление списка игроков
@@ -443,7 +442,6 @@ document.getElementById('resetBtn').addEventListener('click', async function() {
 
     // Обработчики изменения курсов валют
     document.getElementById('usdRate').addEventListener('change', saveCurrencyRates);
-    document.getElementById('eurRate').addEventListener('change', saveCurrencyRates);
     document.getElementById('rubRate').addEventListener('change', saveCurrencyRates);
 
     // Обработчик клика по затемнению
@@ -1198,17 +1196,16 @@ async function fetchExchangeRates() {
     btn.disabled = true;
 
     try {
-        const response = await fetch('https://www.cbr-xml-daily.ru/daily_json.js');
+        const response = await fetch('https://api.exchangerate-api.com/v4/latest/EUR');
         const data = await response.json();
-
-        if (data.Valute) {
-            const usd = data.Valute.USD?.Value || 1.10;
-            const eur = data.Valute.EUR?.Value || 1.00;
-
-            document.getElementById('usdRate').value = (usd / eur).toFixed(4);
-            document.getElementById('eurRate').value = 1.00;
-            document.getElementById('rubRate').value = (eur * 100).toFixed(2);
-
+        
+        if (data.rates) {
+            const usd = data.rates.USD || 1.10;
+            const rub = data.rates.RUB || 90.00;
+            
+            document.getElementById('usdRate').value = usd.toFixed(4);
+            document.getElementById('rubRate').value = rub.toFixed(2);
+            
             saveCurrencyRates();
             showNotification('✅ Курсы валют обновлены', 'success');
         }

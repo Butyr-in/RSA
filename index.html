@@ -50,20 +50,18 @@
         </div>
     </div>
     <div class="header-right">
-        <button id="themeToggle" class="btn-icon" title="Переключить тему">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 2a6 6 0 110 12 6 6 0 010-12z"/>
-            </svg>
-        </button>
-        <button id="importBtn" class="btn-primary">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 1a1 1 0 011 1v6.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L7 8.586V2a1 1 0 011-1z"/>
-                <path d="M2 14a1 1 0 01-1-1v-1a1 1 0 011-1h12a1 1 0 011 1v1a1 1 0 01-1 1H2z"/>
-            </svg>
-            Импорт
-        </button>
-        <button id="resetBtn" class="btn-secondary">Сброс</button>
-    </div>
+    <button id="importBtn" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 1a1 1 0 011 1v6.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L7 8.586V2a1 1 0 011-1z"/>
+            <path d="M2 14a1 1 0 01-1-1v-1a1 1 0 011-1h12a1 1 0 011 1v1a1 1 0 01-1 1H2z"/>
+        </svg>
+        Импорт
+    </button>
+    <button id="resetBtn" class="btn-secondary">Сброс</button>
+    <button id="themeToggle" class="btn-icon" title="Переключить тему">
+        ☀️
+    </button>
+</div>
 </header>
 
         <!-- Виджеты -->
@@ -134,20 +132,20 @@
             </div>
             <div class="footer-center">
                 <div class="currency-rates">
-                    <div class="currency-item">
-                        <span class="currency-symbol">$</span>
-                        <input type="number" id="usdRate" step="0.01" value="1.10" class="currency-input" />
-                    </div>
-                    <div class="currency-item">
-                        <span class="currency-symbol">€</span>
-                        <input type="number" id="eurRate" step="0.01" value="1.00" class="currency-input" />
-                    </div>
-                    <div class="currency-item">
-                        <span class="currency-symbol">₽</span>
-                        <input type="number" id="rubRate" step="0.01" value="90.00" class="currency-input" />
-                    </div>
-                    <button id="updateRatesBtn" class="btn-sm">Обновить курсы</button>
-                </div>
+    <div class="currency-item">
+        <span class="currency-symbol">€</span>
+        <input type="number" id="eurRate" step="0.01" value="1.00" class="currency-input" disabled />
+    </div>
+    <div class="currency-item">
+        <span class="currency-symbol">$</span>
+        <input type="number" id="usdRate" step="0.01" value="1.10" class="currency-input" />
+    </div>
+    <div class="currency-item">
+        <span class="currency-symbol">₽</span>
+        <input type="number" id="rubRate" step="0.01" value="90.00" class="currency-input" />
+    </div>
+    <button id="updateRatesBtn" class="btn-sm">Обновить</button>
+</div>
             </div>
             <div class="footer-right">
                 <span class="copyright">© Butyrin <span id="currentYear">2026</span></span>
