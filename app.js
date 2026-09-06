@@ -722,11 +722,17 @@ document.getElementById('duplicateHandsSkipped').textContent = result.duplicates
 stopProgressAnimation();
 
 // Показываем кнопку "Готово"
+// После завершения импорта
 document.getElementById('progressActions').style.display = 'flex';
-document.getElementById('progressActions').style.justifyContent = 'center';
 document.getElementById('progressStage').textContent = '✅ Готово!';
 document.getElementById('progressFill').style.width = '100%';
 document.getElementById('progressPercentage').textContent = '100%';
+
+// Обновляем данные
+updatePlayerList();
+updateLimitFilter();
+updateUI();
+updateChart();
 
     AppState.isProcessing = false;
 }
@@ -905,27 +911,27 @@ function updateWidgets(stats) {
     }
 
     // ===== ЭФФЕКТИВНОСТЬ =====
-    const efficiencyValue = document.getElementById('efficiencyValue');
-    const efficiencyDetails = document.getElementById('efficiencyDetails');
-    
-    if (widgets.efficiency === 'bb100') {
-        const bb100 = calculateBB100(stats);
-        efficiencyValue.textContent = bb100.toFixed(1) + ' bb/100';
-        efficiencyValue.className = 'widget-value ' + (bb100 >= 0 ? 'positive' : 'negative');
-        efficiencyDetails.textContent = 'Винрейт';
-    } else {
-        const hourly = calculateHourlyIncome(stats);
-        const formattedHourly = (hourly < 0 ? '-' : '') + currencySymbol + Math.abs(hourly).toFixed(2) + '/час';
-        efficiencyValue.textContent = formattedHourly;
-        efficiencyValue.className = 'widget-value ' + (hourly >= 0 ? 'positive' : 'negative');
-        efficiencyDetails.textContent = 'Доход в час';
-    }
+const efficiencyValue = document.getElementById('efficiencyValue');
+const efficiencyDetails = document.getElementById('efficiencyDetails');
+
+if (widgets.efficiency === 'bb100') {
+    const bb100 = calculateBB100(stats);
+    efficiencyValue.textContent = bb100.toFixed(1) + ' bb/100';
+    efficiencyValue.className = 'widget-value ' + (bb100 > 0 ? 'positive' : bb100 < 0 ? 'negative' : '');
+    efficiencyDetails.textContent = 'Винрейт';
+} else {
+    const hourly = calculateHourlyIncome(stats);
+    const formattedHourly = (hourly < 0 ? '-' : '') + currencySymbol + Math.abs(hourly).toFixed(2) + '/час';
+    efficiencyValue.textContent = formattedHourly;
+    efficiencyValue.className = 'widget-value ' + (hourly > 0 ? 'positive' : hourly < 0 ? 'negative' : '');
+    efficiencyDetails.textContent = 'Доход в час';
+}
 
     // ===== ОБЩИЙ РЕЗУЛЬТАТ =====
-    const result = stats.netResult || 0;
-    const formattedResult = (result < 0 ? '-' : '') + currencySymbol + Math.abs(result).toFixed(2);
-    document.getElementById('netResult').textContent = formattedResult;
-    document.getElementById('netResult').className = 'widget-value ' + (result >= 0 ? 'positive' : 'negative');
+const result = stats.netResult || 0;
+const formattedResult = (result < 0 ? '-' : '') + currencySymbol + Math.abs(result).toFixed(2);
+document.getElementById('netResult').textContent = formattedResult;
+document.getElementById('netResult').className = 'widget-value ' + (result > 0 ? 'positive' : result < 0 ? 'negative' : '');
 }
 
 // ============================================================
