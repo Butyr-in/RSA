@@ -79,12 +79,13 @@
     </div>
     <div class="widget" data-widget="efficiency">
         <div class="widget-label">Эффективность</div>
-        <div class="widget-value" id="efficiencyValue">0 bb/100</div>
+        <div class="widget-value" id="efficiencyValue">0</div>
         <div class="widget-sub" id="efficiencyDetails">Винрейт</div>
     </div>
     <div class="widget" data-widget="result">
     <div class="widget-label">Результат</div>
-    <div class="widget-value" id="netResult">€0.00</div>
+    <div class="widget-value" id="netResult">€0</div>
+    <div class="widget-sub" id="resultCurrency">EUR</div>
 </div>
 </section>
 
@@ -96,11 +97,9 @@
                     <button class="chart-btn" data-mode="days">По дням</button>
                 </div>
                 <div class="chart-period">
-                    <input type="date" id="dateStart" class="date-input" />
-                    <span>—</span>
-                    <input type="date" id="dateEnd" class="date-input" />
-                    <button id="clearDateFilter" class="btn-sm">✕</button>
-                </div>
+    <input type="text" id="dateRange" class="date-input" placeholder="Выберите период" />
+    <button id="clearDateFilter" class="btn-sm">✕</button>
+</div>
             </div>
             <div class="chart-container">
                 <canvas id="chartCanvas"></canvas>
@@ -123,6 +122,36 @@
                     <label>Разрыв (минуты):</label>
                     <input type="number" id="sessionBreak" value="5" min="0" max="60" />
                 </div>
+                <div class="setting-group">
+    <label>Часовой пояс:</label>
+    <select id="timezoneOffset" class="select">
+        <option value="-12">UTC-12</option>
+        <option value="-11">UTC-11</option>
+        <option value="-10">UTC-10</option>
+        <option value="-9">UTC-9</option>
+        <option value="-8">UTC-8</option>
+        <option value="-7">UTC-7</option>
+        <option value="-6">UTC-6</option>
+        <option value="-5">UTC-5</option>
+        <option value="-4">UTC-4</option>
+        <option value="-3">UTC-3</option>
+        <option value="-2">UTC-2</option>
+        <option value="-1">UTC-1</option>
+        <option value="0" selected>UTC+0</option>
+        <option value="1">UTC+1</option>
+        <option value="2">UTC+2</option>
+        <option value="3">UTC+3</option>
+        <option value="4">UTC+4</option>
+        <option value="5">UTC+5</option>
+        <option value="6">UTC+6</option>
+        <option value="7">UTC+7</option>
+        <option value="8">UTC+8</option>
+        <option value="9">UTC+9</option>
+        <option value="10">UTC+10</option>
+        <option value="11">UTC+11</option>
+        <option value="12">UTC+12</option>
+    </select>
+</div>
             </div>
             <div class="footer-center">
                 <div class="currency-rates">
@@ -151,13 +180,12 @@
     <div id="aliasModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Алиасы (дополнительные ники)</h3>
+                <h3>Алиас</h3>
                 <button class="modal-close" id="aliasModalClose">&times;</button>
             </div>
             <div class="modal-body">
                 <p>Введите дополнительные ники через запятую:</p>
-                <textarea id="aliasInput" rows="3" placeholder="nick1, nick2, nick3"></textarea>
-                <div class="modal-actions">
+                <textarea id="aliasInput" rows="2" placeholder="nick1, nick2, nick3" style="width: 100%; text-align: center; resize: vertical; padding-top: 15px; padding-bottom: 5px;"></textarea>               <div class="modal-actions">
                     <button id="saveAliases" class="btn-primary">Сохранить</button>
                     <button id="cancelAliases" class="btn-secondary">Отмена</button>
                 </div>
@@ -195,14 +223,16 @@
     <div class="progress-details" id="progressDetails">
         <span>Файлы: <span id="processedFiles">0</span> / <span id="totalFiles">0</span></span>
     </div>
-    <div class="progress-stats">
-        <span>📊 Найдено раздач: <span id="totalHandsFound">0</span></span>
-        <span>➕ Добавлено: <span id="newHandsAdded">0</span></span>
-        <span>⏭ Пропущено дублей: <span id="duplicateHandsSkipped">0</span></span>
-    </div>
-    <div class="modal-actions" id="progressActions" style="display: none;">
-        <button id="closeImportBtn" class="btn-primary">Готово</button>
-    </div>
+</div>
+
+<!-- Вне контейнера -->
+<div class="progress-stats" id="progressStats" style="display: none;">
+    <span>Найдено раздач: <span id="totalHandsFound">0</span></span>
+    <span>Добавлено раздач: <span id="newHandsAdded">0</span></span>
+    <span>Пропущено дублей: <span id="duplicateHandsSkipped">0</span></span>
+</div>
+<div class="modal-actions" id="progressActions" style="display: none;">
+    <button id="closeImportBtn" class="btn-primary">Готово</button>
 </div>
         </div>
     </div>
@@ -218,6 +248,118 @@
     <!-- Библиотеки -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <style>
+    .flatpickr-calendar {
+        background: var(--bg-secondary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 12px !important;
+        box-shadow: var(--shadow-md) !important;
+        font-family: 'Roboto', sans-serif !important;
+    }
+    
+    .flatpickr-day {
+        color: var(--text-primary) !important;
+        border-radius: 6px !important;
+    }
+    
+    .flatpickr-day:hover {
+        background: var(--bg-hover) !important;
+        color: var(--text-primary) !important;
+    }
+    
+    .flatpickr-day.selected,
+    .flatpickr-day.startRange,
+    .flatpickr-day.endRange,
+    .flatpickr-day.selected:hover {
+        background: var(--color-accent) !important;
+        border-color: var(--color-accent) !important;
+        color: white !important;
+        box-shadow: none !important;
+    }
+    
+    .flatpickr-day.today {
+        border-color: var(--color-accent) !important;
+    }
+    
+    .flatpickr-day.today:hover {
+        background: var(--color-accent) !important;
+        color: white !important;
+    }
+    
+    .flatpickr-day.inRange {
+        background: rgba(66, 153, 225, 0.15) !important;
+        color: var(--text-primary) !important;
+        box-shadow: none !important;
+    }
+    
+    .flatpickr-day.prevMonthDay,
+    .flatpickr-day.nextMonthDay {
+        color: var(--text-muted) !important;
+        opacity: 0.5 !important;
+    }
+    
+    .flatpickr-months .flatpickr-month {
+        color: var(--text-primary) !important;
+        fill: var(--text-primary) !important;
+    }
+    
+    .flatpickr-current-month {
+        color: var(--text-primary) !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+    }
+    
+    .flatpickr-current-month input.cur-year {
+        color: var(--text-primary) !important;
+    }
+    
+    .flatpickr-weekday {
+        color: var(--text-muted) !important;
+    }
+    
+    .flatpickr-time input {
+        color: var(--text-primary) !important;
+    }
+    
+    .flatpickr-time .flatpickr-am-pm {
+        color: var(--text-primary) !important;
+    }
+    
+    .flatpickr-months .flatpickr-prev-month,
+    .flatpickr-months .flatpickr-next-month {
+        color: var(--text-primary) !important;
+        fill: var(--text-primary) !important;
+    }
+    
+    .flatpickr-months .flatpickr-prev-month:hover svg,
+    .flatpickr-months .flatpickr-next-month:hover svg {
+        fill: var(--color-accent) !important;
+    }
+    
+    .flatpickr-input {
+        background: var(--bg-input) !important;
+        color: var(--text-primary) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 6px !important;
+        padding: 6px 10px !important;
+        font-size: 13px !important;
+        font-family: 'Roboto', sans-serif !important;
+        width: 180px !important;
+    }
+    
+    .flatpickr-input:focus {
+        outline: none !important;
+        border-color: var(--border-active) !important;
+        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15) !important;
+    }
+    
+    .flatpickr-input::placeholder {
+        color: var(--text-muted) !important;
+    }
+</style>
 
     <!-- Наши скрипты в правильном порядке -->
     <script src="core/constants.js"></script>
@@ -230,7 +372,6 @@
     <script src="ui/components/Chart.js"></script>
     <script src="ui/components/DayList.js"></script>
     <script src="ui/components/Widgets.js"></script>
-    <script src="ui/components/Footer.js"></script>
     <script src="ui/components/Header.js"></script>
     <script src="ui/modals/AliasModal.js"></script>
     <script src="ui/modals/ImportModal.js"></script>

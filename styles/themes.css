@@ -64,33 +64,33 @@
     --scrollbar-thumb: #2d3748;
 }
 
-/* ===== Бежевая тема ===== */
+/* ===== Бежевая тема (тёплая) ===== */
 .beige-theme {
-    --bg-primary: #f0e8dc;
-    --bg-secondary: #faf6f0;
-    --bg-card: #fdfaf5;
-    --bg-input: #f0e8dc;
-    --bg-hover: #e8dfd0;
-    --bg-dropzone: #f5ede2;
-    --bg-dropzone-hover: #ede3d4;
-    --text-primary: #3d2e1e;
-    --text-secondary: #6b5340;
-    --text-muted: #8a7560;
-    --text-inverse: #fdfaf5;
-    --border-color: #d4c5b5;
-    --border-active: #a67c52;
-    --shadow-sm: 0 1px 3px rgba(61,46,30,0.08);
-    --shadow-md: 0 4px 12px rgba(61,46,30,0.12);
-    --shadow-lg: 0 8px 24px rgba(61,46,30,0.16);
-    --color-positive: #4a7c3f;
-    --color-positive-bg: #f0f5ec;
-    --color-negative: #a04040;
-    --color-negative-bg: #f5ecec;
-    --color-accent: #a67c52;
-    --color-accent-hover: #8a663e;
-    --color-warning: #c4a84a;
-    --scrollbar-track: #ede3d4;
-    --scrollbar-thumb: #d4c5b5;
+    --bg-primary: #f5ede3;          /* Тёплый кремовый фон */
+    --bg-secondary: #fdf8f2;        /* Светлый тёплый бежевый */
+    --bg-card: #fffaf4;             /* Почти белый с тёплым оттенком */
+    --bg-input: #f0e6d8;            /* Тёплый светло-бежевый */
+    --bg-hover: #e8dcc9;            /* Более насыщенный тёплый */
+    --bg-dropzone: #f8f0e5;         /* Тёплый светло-бежевый */
+    --bg-dropzone-hover: #f0e4d4;   /* Чуть темнее при наведении */
+    --text-primary: #3d2e1e;        /* Тёмно-коричневый */
+    --text-secondary: #6b5340;      /* Тёплый коричневый */
+    --text-muted: #8a7560;          /* Приглушённый тёплый */
+    --text-inverse: #fdf8f2;        /* Тёплый белый */
+    --border-color: #d9c8b3;        /* Тёплый песочный */
+    --border-active: #a67c52;       /* Карамельный */
+    --shadow-sm: 0 1px 3px rgba(61,46,30,0.10);
+    --shadow-md: 0 4px 12px rgba(61,46,30,0.15);
+    --shadow-lg: 0 8px 24px rgba(61,46,30,0.20);
+    --color-positive: #5a8f4a;      /* Тёплый зелёный */
+    --color-positive-bg: #f2f7ec;
+    --color-negative: #b34a4a;      /* Тёплый красный */
+    --color-negative-bg: #f9eeee;
+    --color-accent: #b8894d;        /* Тёплый янтарный */
+    --color-accent-hover: #a67740;  /* Темнее при наведении */
+    --color-warning: #d4a94e;       /* Тёплый золотистый */
+    --scrollbar-track: #f0e4d4;
+    --scrollbar-thumb: #d9c8b3;
 }
 
 /* ===== Общие стили ===== */

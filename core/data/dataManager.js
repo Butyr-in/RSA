@@ -1,4 +1,3 @@
-// core/data/dataManager.js
 // ============================================================
 // DATA MANAGER (с IndexedDB)
 // ============================================================
@@ -141,7 +140,6 @@ function countHandsInDB() {
         }
     });
 }
-
 // ============================================================
 // DATA MANAGER
 // ============================================================
@@ -264,7 +262,6 @@ class DataManager {
         for (const hand of heroHands) {
             const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
             if (player) {
-                // Используем calculateResult вместо calculateTotalInvested
                 const result = calculateResult(hand.players, this.heroNick);
                 this.calculator.addHand({
                     ...hand,
@@ -275,113 +272,135 @@ class DataManager {
 
         this.stats = this.calculator.getStats(this.settings?.sessionBreakMinutes || 5);
     }
-
     getStats(filters = {}) {
-        if (!this.stats) {
-            this.recalculateStats();
-        }
-
-        const breakMinutes = this.settings?.sessionBreakMinutes || 5;
-        let stats = Object.assign({}, this.stats);
-
-        if (filters.limits && filters.limits.length > 0) {
-            const filteredHands = this.hands.filter(hand => {
-                const limit = 'NL' + hand.limit;
-                return filters.limits.includes(limit);
-            });
-
-            const tempCalculator = new StatsCalculator();
-            for (const hand of filteredHands) {
-                const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
-                if (player) {
-                    const result = calculateResult(hand.players, this.heroNick);
-                    tempCalculator.addHand({
-                        ...hand,
-                        result: result
-                    });
-                }
-            }
-            stats = tempCalculator.getStats(breakMinutes);
-        }
-
-        if (filters.startDate && filters.endDate) {
-            const start = new Date(filters.startDate);
-            const end = new Date(filters.endDate);
-            const filteredHands = this.hands.filter(hand => {
-                const date = new Date(hand.startDate);
-                return date >= start && date <= end;
-            });
-
-            const tempCalculator = new StatsCalculator();
-            for (const hand of filteredHands) {
-                const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
-                if (player) {
-                    const result = calculateResult(hand.players, this.heroNick);
-                    tempCalculator.addHand({
-                        ...hand,
-                        result: result
-                    });
-                }
-            }
-            stats = tempCalculator.getStats(breakMinutes);
-        }
-
-        return stats;
+    if (!this.stats) {
+        this.recalculateStats();
     }
 
-    getDays(settings = {}) {
-        const dayStartHour = settings.dayStartHour || this.settings.dayStartHour;
-        const sessionBreak = settings.sessionBreakMinutes || this.settings.sessionBreakMinutes;
+    const breakMinutes = this.settings?.sessionBreakMinutes || 5;
+    let stats = Object.assign({}, this.stats);
 
-        const heroHands = this.hands.filter(hand => {
-            return hand.players && hand.players.some(p => p.name === this.heroNick || this.aliases.includes(p.name));
+    // Если переданы конкретные руки
+    if (filters.hands) {
+        const tempCalculator = new StatsCalculator();
+        for (const hand of filters.hands) {
+            const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
+            if (player) {
+                const result = calculateResult(hand.players, this.heroNick);
+                tempCalculator.addHand({
+                    ...hand,
+                    result: result
+                });
+            }
+        }
+        stats = tempCalculator.getStats(breakMinutes);
+    }
+
+    if (filters.limits && filters.limits.length > 0) {
+        const filteredHands = this.hands.filter(hand => {
+            const limit = 'NL' + hand.limit;
+            return filters.limits.includes(limit);
         });
 
-        const daysMap = {};
-
-        for (const hand of heroHands) {
+        const tempCalculator = new StatsCalculator();
+        for (const hand of filteredHands) {
             const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
-            if (!player) continue;
-
-            const date = new Date(hand.startDate);
-            const dayKey = this.getDayKey(date, dayStartHour);
-
-            if (!daysMap[dayKey]) {
-                daysMap[dayKey] = {
-                    date: dayKey,
-                    hands: [],
-                    netResult: 0
-                };
+            if (player) {
+                const result = calculateResult(hand.players, this.heroNick);
+                tempCalculator.addHand({
+                    ...hand,
+                    result: result
+                });
             }
-
-            const result = calculateResult(hand.players, this.heroNick);
-            daysMap[dayKey].hands.push({
-                ...hand,
-                result: result
-            });
-            daysMap[dayKey].netResult += result;
         }
-
-        const result = [];
-        for (const dayKey in daysMap) {
-            const dayData = daysMap[dayKey];
-            const sortedHands = dayData.hands.slice().sort((a, b) => a.startDate - b.startDate);
-            const sessions = this.groupIntoSessions(sortedHands, sessionBreak);
-
-            result.push({
-                day: dayKey,
-                hands: sortedHands,
-                sessions: sessions,
-                netResult: dayData.netResult,
-                totalHands: sortedHands.length,
-                totalTime: sessions.reduce((sum, s) => sum + s.duration, 0)
-            });
-        }
-
-        result.sort((a, b) => a.day.localeCompare(b.day));
-
-        return result;
+        stats = tempCalculator.getStats(breakMinutes);
     }
+
+    if (filters.startDate && filters.endDate) {
+        const start = new Date(filters.startDate);
+        const end = new Date(filters.endDate);
+        const filteredHands = this.hands.filter(hand => {
+            const date = new Date(hand.startDate);
+            return date >= start && date <= end;
+        });
+
+        const tempCalculator = new StatsCalculator();
+        for (const hand of filteredHands) {
+            const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
+            if (player) {
+                const result = calculateResult(hand.players, this.heroNick);
+                tempCalculator.addHand({
+                    ...hand,
+                    result: result
+                });
+            }
+        }
+        stats = tempCalculator.getStats(breakMinutes);
+    }
+
+    return stats;
+}
+
+    getDays(settings = {}) {
+    const dayStartHour = settings.dayStartHour || this.settings.dayStartHour;
+    const sessionBreak = settings.sessionBreakMinutes || this.settings.sessionBreakMinutes;
+
+    const heroHands = this.hands.filter(hand => {
+        return hand.players && hand.players.some(p => p.name === this.heroNick || this.aliases.includes(p.name));
+    });
+
+    const daysMap = {};
+
+    for (const hand of heroHands) {
+        const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
+        if (!player) continue;
+
+        const correctedDate = new Date(hand.startDate);
+        correctedDate.setHours(correctedDate.getHours() + (this.settings.timezoneOffset || 0));
+        const dayKey = this.getDayKey(correctedDate, dayStartHour);
+
+        if (!daysMap[dayKey]) {
+            daysMap[dayKey] = {
+                date: dayKey,
+                hands: [],
+                netResult: 0
+            };
+        }
+
+        const result = calculateResult(hand.players, this.heroNick);
+        daysMap[dayKey].hands.push({
+            ...hand,
+            result: result
+        });
+        daysMap[dayKey].netResult += result;
+    }
+
+    const result = [];
+    for (const dayKey in daysMap) {
+        const dayData = daysMap[dayKey];
+        const sortedHands = dayData.hands.slice().sort((a, b) => a.startDate - b.startDate);
+        const sessions = this.groupIntoSessions(sortedHands, sessionBreak);
+        
+        // ✅ ВОТ ЗДЕСЬ:
+        const dayStartTime = sortedHands[0].startDate;
+        const dayEndTime = sortedHands[sortedHands.length - 1].startDate;
+
+        result.push({
+            day: dayKey,
+            hands: sortedHands,
+            sessions: sessions,
+            netResult: dayData.netResult,
+            totalHands: sortedHands.length,
+            totalTime: sessions.reduce((sum, s) => sum + s.duration, 0),
+            dayStartTime: dayStartTime,
+            dayEndTime: dayEndTime
+        });
+    }
+
+    result.sort((a, b) => a.day.localeCompare(b.day));
+
+    return result;
+}
 
     getDayKey(date, dayStartHour) {
         const d = new Date(date);
@@ -399,18 +418,29 @@ class DataManager {
         const sessions = [];
         let currentSession = [hands[0]];
         const breakMs = breakMinutes * 60 * 1000;
+        const timezoneOffset = this.settings.timezoneOffset || 0;
+        
+        const getCorrectedDate = (date) => {
+            const corrected = new Date(date);
+            corrected.setHours(corrected.getHours() + timezoneOffset);
+            return corrected;
+        };
 
         for (let i = 1; i < hands.length; i++) {
             const prevHand = hands[i - 1];
             const currentHand = hands[i];
+            
             const diff = currentHand.startDate - prevHand.startDate;
 
             if (diff > breakMs) {
+                const firstHandDate = currentSession[0].startDate;
+                const lastHandDate = currentSession[currentSession.length - 1].startDate;
+
                 sessions.push({
                     hands: currentSession,
-                    startTime: currentSession[0].startDate,
-                    endTime: currentSession[currentSession.length - 1].startDate,
-                    duration: (currentSession[currentSession.length - 1].startDate - currentSession[0].startDate) / 1000,
+                    startTime: getCorrectedDate(firstHandDate),
+                    endTime: getCorrectedDate(lastHandDate),
+                    duration: (lastHandDate - firstHandDate) / 1000,
                     netResult: currentSession.reduce((sum, h) => sum + h.result, 0),
                     handsCount: currentSession.length
                 });
@@ -421,11 +451,14 @@ class DataManager {
         }
 
         if (currentSession.length > 0) {
+            const firstHandDate = currentSession[0].startDate;
+            const lastHandDate = currentSession[currentSession.length - 1].startDate;
+
             sessions.push({
                 hands: currentSession,
-                startTime: currentSession[0].startDate,
-                endTime: currentSession[currentSession.length - 1].startDate,
-                duration: (currentSession[currentSession.length - 1].startDate - currentSession[0].startDate) / 1000,
+                startTime: getCorrectedDate(firstHandDate),
+                endTime: getCorrectedDate(lastHandDate),
+                duration: (lastHandDate - firstHandDate) / 1000,
                 netResult: currentSession.reduce((sum, h) => sum + h.result, 0),
                 handsCount: currentSession.length
             });
@@ -486,9 +519,7 @@ class DataManager {
     updateSettings(settings) {
         this.settings = Object.assign({}, this.settings, settings);
         this.saveSettings();
-        if (this.heroNick && this.hands.length > 0) {
-            this.recalculateStats();
-        }
+        this.recalculateStats();
     }
 
     async getHandsCount() {

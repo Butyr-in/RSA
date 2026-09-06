@@ -293,9 +293,35 @@ function setupEvents() {
         toggleTheme();
     });
 
-    document.getElementById('importBtn').addEventListener('click', function() {
+        document.getElementById('importBtn').addEventListener('click', function() {
+        // Принудительно прячем синюю полосу загрузки
+        document.getElementById('progressContainer').classList.add('hidden');
+        
+        // Полностью обнуляем технические индикаторы процентов и файлов
+        document.getElementById('progressPercentage').textContent = '0%';
+        document.getElementById('progressStage').textContent = 'Подготовка...';
+        document.getElementById('processedFiles').textContent = '0';
+        document.getElementById('totalFiles').textContent = '0';
+        
+        // Начисто очищаем и прячем блок со старым отчетом
+        const progressStats = document.getElementById('progressStats');
+if (progressStats) {
+    progressStats.style.display = 'none';
+}
+        document.getElementById('totalHandsFound').textContent = '0';
+        document.getElementById('newHandsAdded').textContent = '0';
+        document.getElementById('duplicateHandsSkipped').textContent = '0';
+        
+        // Прячем кнопку "Готово", чтобы она не появилась раньше времени
+        const progressActions = document.getElementById('progressActions');
+        if (progressActions) {
+            progressActions.style.display = 'none';
+        }
+        
+        // Открываем стерильно чистое модальное окно
         openModal('importModal');
     });
+
 
     document.getElementById('importModalClose').addEventListener('click', function() {
         closeModal('importModal');
@@ -365,24 +391,6 @@ function setupEvents() {
         });
     });
 
-    document.getElementById('dateStart').addEventListener('change', function() {
-        AppState.dateStart = this.value;
-        updateChart();
-    });
-
-    document.getElementById('dateEnd').addEventListener('change', function() {
-        AppState.dateEnd = this.value;
-        updateChart();
-    });
-
-    document.getElementById('clearDateFilter').addEventListener('click', function() {
-        AppState.dateStart = null;
-        AppState.dateEnd = null;
-        document.getElementById('dateStart').value = '';
-        document.getElementById('dateEnd').value = '';
-        updateChart();
-    });
-
     document.getElementById('dayStart').addEventListener('change', function() {
         const parts = this.value.split(':').map(Number);
         AppState.dataManager.updateSettings({
@@ -399,6 +407,20 @@ function setupEvents() {
         });
         updateDayList();
     });
+
+    document.getElementById('timezoneOffset').addEventListener('change', function() {
+    const offset = parseInt(this.value) || 0;
+    AppState.dataManager.updateSettings({ timezoneOffset: offset });
+    updateUI();
+    updateChart();
+    updateDayList();
+});
+
+    // Загружаем сохранённое значение
+const savedOffset = AppState.dataManager.settings.timezoneOffset;
+if (savedOffset !== undefined) {
+    document.getElementById('timezoneOffset').value = savedOffset;
+}
 
     document.getElementById('updateRatesBtn').addEventListener('click', function() {
         fetchExchangeRates();
@@ -421,6 +443,38 @@ function setupEvents() {
         closeModal('importModal');
         hideProgress();
     });
+
+    // Инициализация Flatpickr для выбора диапазона дат
+flatpickr("#dateRange", {
+    mode: "range",
+    dateFormat: "Y-m-d",
+    onChange: function(selectedDates, dateStr) {
+        if (selectedDates.length === 2) {
+            AppState.dateStart = selectedDates[0].toISOString().split('T')[0];
+            AppState.dateEnd = selectedDates[1].toISOString().split('T')[0];
+            document.getElementById('dateRange').value = dateStr;
+            updateChart();
+            updateDayList();
+            updateUI();
+        } else if (selectedDates.length === 0) {
+            AppState.dateStart = null;
+            AppState.dateEnd = null;
+            document.getElementById('dateRange').value = '';
+            updateChart();
+            updateDayList();
+            updateUI();
+        }
+    }
+});
+
+document.getElementById('clearDateFilter').addEventListener('click', function() {
+    AppState.dateStart = null;
+    AppState.dateEnd = null;
+    document.getElementById('dateRange').value = '';
+    updateChart();
+    updateDayList();
+    updateUI();
+});
 }
 
 // Обработка изменения чекбоксов лимитов
@@ -602,6 +656,19 @@ async function handleFiles(fileList) {
     AppState.isProcessing = true;
     const files = Array.from(fileList);
 
+    // Скрываем блок с кнопкой и отчётом перед началом обработки
+    const progressStats = document.getElementById('progressStats');
+    if (progressStats) {
+        progressStats.style.display = 'none';
+    }
+    const progressActions = document.getElementById('progressActions');
+    if (progressActions) {
+        progressActions.style.display = 'none';
+    }
+    document.getElementById('totalHandsFound').textContent = '0';
+    document.getElementById('newHandsAdded').textContent = '0';
+    document.getElementById('duplicateHandsSkipped').textContent = '0';
+
     const xmlFiles = [];
     const archives = [];
 
@@ -659,39 +726,46 @@ async function handleFiles(fileList) {
         updateProgress('parsing', 'Обработка файлов...', progress, allFiles.length, processed);
     }
 
-    updateProgress('saving', 'Сохранение данных...', 100);
-
     const result = await AppState.dataManager.addHands(allHands);
+    
+    // Скрываем синий индикатор полосы загрузки
+    document.getElementById('progressContainer').classList.add('hidden');
+    AppState.isProcessing = false;
 
+    // Включаем отображение отчета и записываем туда свежие цифры
+    // Используем уже объявленные переменные progressStats и progressActions
+    if (progressStats) {
+        progressStats.style.display = 'flex';
+    }
     document.getElementById('totalHandsFound').textContent = allHands.length;
     document.getElementById('newHandsAdded').textContent = result.added;
     document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
 
-    hideProgress();
-    AppState.isProcessing = false;
+    // Показываем кнопку "Готово", чтобы окно закрывалось только по клику
+    if (progressActions) {
+        progressActions.style.display = 'flex';
+    }
 
+    // Выводим всплывающее уведомление на главном экране (под модалкой)
     if (result.added > 0) {
         showNotification('✅ Добавлено ' + result.added + ' новых раздач (' + result.duplicates + ' пропущено дублей)', 'success');
         
-        // Обновляем список игроков
         updatePlayerList();
         updateLimitFilter();
         
-        // Если герой уже выбран, пересчитываем статистику
         if (AppState.dataManager.heroNick) {
             AppState.dataManager.recalculateStats();
             updateUI();
             updateChart();
         } else {
-            // Если герой не выбран, показываем подсказку
             showNotification('👤 Выберите героя из списка', 'info');
         }
     } else {
         showNotification('ℹ️ Новых раздач не найдено (' + result.duplicates + ' уже загружены)', 'info');
     }
-
-    closeModal('importModal');
 }
+
+
 
 async function extractArchive(file) {
     try {
@@ -727,8 +801,11 @@ function showProgress() {
     document.getElementById('totalHandsFound').textContent = '0';
     document.getElementById('newHandsAdded').textContent = '0';
     document.getElementById('duplicateHandsSkipped').textContent = '0';
-    
-    document.getElementById('progressActions').style.display = 'none';
+    // Скрываем счётчики при старте
+const progressStats = document.getElementById('progressStats');
+if (progressStats) {
+    progressStats.style.display = 'none';
+}
 }
 
 function updateProgress(stage, message, percent, total, processed) {
@@ -749,11 +826,11 @@ function updateProgress(stage, message, percent, total, processed) {
 }
 
 function hideProgress() {
+    // Просто прячем синюю полосу, не трогая текст отчета на экране
     document.getElementById('progressContainer').classList.add('hidden');
     document.getElementById('progressFill').style.width = '0%';
-    
-    document.getElementById('progressActions').style.display = 'none';
 }
+
 
 function stopProgressAnimation() {
     const progressFill = document.getElementById('progressFill');
@@ -795,10 +872,37 @@ function closeAllModals() {
 
 function updateUI() {
     const selectedLimits = getSelectedLimits();
-    const stats = AppState.dataManager.getStats({ limits: selectedLimits });
+    const offset = AppState.dataManager.settings.timezoneOffset || 0;
+    
+    // Получаем все руки
+    let allHands = AppState.dataManager.hands;
+    
+    // Фильтруем по датам с учетом выбранного часового пояса
+    if (AppState.dateStart) {
+        const start = new Date(AppState.dateStart);
+        start.setHours(0, 0, 0, 0);
+        allHands = allHands.filter(h => {
+            const corrected = new Date(h.startDate);
+            corrected.setHours(corrected.getHours() + offset);
+            return corrected >= start;
+        });
+    }
+    if (AppState.dateEnd) {
+        const end = new Date(AppState.dateEnd);
+        end.setHours(23, 59, 59, 999);
+        allHands = allHands.filter(h => {
+            const corrected = new Date(h.startDate);
+            corrected.setHours(corrected.getHours() + offset);
+            return corrected <= end;
+        });
+    }
+    
+    // Получаем статистику с учётом фильтров
+    const stats = AppState.dataManager.getStats({ limits: selectedLimits, hands: allHands });
     updateWidgets(stats);
     updateDayList(selectedLimits);
 }
+
 
 // Расчёт винрейта bb/100
 function calculateBB100(stats) {
@@ -849,24 +953,27 @@ function updateWidgets(stats) {
 
     // ===== ВРЕМЯ =====
     if (widgets.time === 'hours') {
-        document.getElementById('totalTime').textContent = formatTime(stats.totalTime || 0);
-        document.getElementById('totalTimeMinutes').textContent = 'Часы';
-    } else {
+    const totalSeconds = stats.totalTime || 0;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    document.getElementById('totalTime').textContent = hours + ':' + String(minutes).padStart(2, '0');
+    document.getElementById('totalTimeMinutes').textContent = 'ЧЧ:ММ';
+} else {
         const minutes = Math.round((stats.totalTime || 0) / 60);
-        document.getElementById('totalTime').textContent = minutes + ' мин';
+        document.getElementById('totalTime').textContent = minutes;
         document.getElementById('totalTimeMinutes').textContent = 'Минуты';
     }
 
     // ===== ЭФФЕКТИВНОСТЬ =====
     if (widgets.efficiency === 'bb100') {
         const bb100 = calculateBB100(stats);
-        efficiencyValue.textContent = bb100.toFixed(1) + ' bb/100';
+        efficiencyValue.textContent = bb100.toFixed(2);
         efficiencyValue.className = 'widget-value ' + (bb100 > 0 ? 'positive' : bb100 < 0 ? 'negative' : '');
-        efficiencyDetails.textContent = 'Винрейт';
+        efficiencyDetails.textContent = 'bb/100';
     } else {
         const hourly = calculateHourlyIncome(stats);
         const convertedHourly = convertCurrency(hourly);
-        const formattedHourly = (convertedHourly < 0 ? '-' : '') + currencySymbol + Math.abs(convertedHourly).toFixed(2) + '/час';
+        const formattedHourly = (convertedHourly < 0 ? '-' : '') + currencySymbol + Math.abs(convertedHourly).toFixed(2);
         efficiencyValue.textContent = formattedHourly;
         efficiencyValue.className = 'widget-value ' + (convertedHourly > 0 ? 'positive' : convertedHourly < 0 ? 'negative' : '');
         efficiencyDetails.textContent = 'Доход в час';
@@ -874,10 +981,20 @@ function updateWidgets(stats) {
 
     // ===== ОБЩИЙ РЕЗУЛЬТАТ =====
     const result = stats.netResult || 0;
-    const convertedResult = convertCurrency(result);
-    const formattedResult = (convertedResult < 0 ? '-' : '') + currencySymbol + Math.abs(convertedResult).toFixed(2);
-    document.getElementById('netResult').textContent = formattedResult;
-    document.getElementById('netResult').className = 'widget-value ' + (convertedResult > 0 ? 'positive' : convertedResult < 0 ? 'negative' : '');
+const convertedResult = convertCurrency(result);
+const formattedResult = (convertedResult < 0 ? '-' : '') + currencySymbol + Math.abs(Math.round(convertedResult));
+document.getElementById('netResult').textContent = formattedResult;
+document.getElementById('netResult').className = 'widget-value ' + (convertedResult > 0 ? 'positive' : convertedResult < 0 ? 'negative' : '');
+// Обновляем подпись валюты
+const currencyName = document.getElementById('resultCurrency');
+if (currencyName) {
+    const names = {
+        eur: 'EUR',
+        usd: 'USD',
+        rub: 'RUB'
+    };
+    currencyName.textContent = names[AppState.widgetModes.result] || 'EUR';
+}
 }
 
 function convertCurrency(amount) {
@@ -905,34 +1022,64 @@ function updateDayList(selectedLimits = []) {
         limits: selectedLimits
     });
 
+    // Фильтрация по датам
+    let filteredDays = days;
+    if (AppState.dateStart) {
+        const start = new Date(AppState.dateStart);
+        filteredDays = filteredDays.filter(day => new Date(day.day) >= start);
+    }
+    if (AppState.dateEnd) {
+        const end = new Date(AppState.dateEnd);
+        end.setHours(23, 59, 59);
+        filteredDays = filteredDays.filter(day => new Date(day.day) <= end);
+    }
+
     const container = document.getElementById('dayList');
     const currencySymbol = getCurrencySymbol();
 
-    if (days.length === 0) {
+    if (filteredDays.length === 0) {
         container.innerHTML = '<div class="empty-state">Нет данных для отображения</div>';
         return;
     }
 
-    let html = '<div class="day-list-header">';
+    let html = '<div class="day-list-header" id="dayListHeader" style="cursor: pointer;" title="Кликните для копирования">';
     html += '<span>День</span>';
+    html += '<span>Лимит</span>';
     html += '<span>Раздачи</span>';
     html += '<span>Время</span>';
-    html += '<span>Лимит</span>';
     html += '<span>Результат</span>';
     html += '</div>';
 
-    for (const day of days) {
+    for (const day of filteredDays) {
         const isExpanded = AppState.expandedDay === day.day;
         const resultClass = day.netResult > 0 ? 'positive' : day.netResult < 0 ? 'negative' : '';
         const avgLimit = calculateAverageLimitForDay(day);
         
         const convertedDayResult = convertCurrency(day.netResult);
+        
+        // Безопасно вытаскиваем реальное время начала первой сессии и конца последней сессии дня
+        let startStr = formatDate(day.day);
+        let endStr = '';
+        
+        if (day.sessions && day.sessions.length > 0) {
+            const firstSession = day.sessions[0];
+            const lastSession = day.sessions[day.sessions.length - 1];
+            
+            // Если объекты дат существуют, форматируем их в красивую строку с часами и минутами
+            if (firstSession.startTime && lastSession.endTime) {
+                const startHours = firstSession.startTime.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                const endHours = lastSession.endTime.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                
+                startStr = formatDate(day.day) + ' ' + startHours;
+                endStr = ' - ' + endHours;
+            }
+        }
 
         html += '<div class="day-item" data-day="' + day.day + '">';
-        html += '<span class="day-date">' + formatDate(day.day) + '</span>';
+        html += '<span class="day-date">' + startStr + ' - ' + endStr + '</span>';
+        html += '<span class="limit">NL' + avgLimit + '</span>';
         html += '<span class="hands-count">' + day.totalHands + '</span>';
         html += '<span class="time">' + formatTime(day.totalTime) + '</span>';
-        html += '<span class="limit">NL' + avgLimit + '</span>';
         html += '<span class="result ' + resultClass + '">' + (convertedDayResult < 0 ? '-' : '') + currencySymbol + Math.abs(convertedDayResult).toFixed(2) + '</span>';
         html += '</div>';
 
@@ -946,9 +1093,9 @@ function updateDayList(selectedLimits = []) {
 
                 html += '<div class="session-item">';
                 html += '<span class="session-time">' + formatTimeSession(session.startTime, session.endTime) + '</span>';
+                html += '<span class="session-limit">NL' + sessionAvgLimit + '</span>';
                 html += '<span class="session-hands">' + session.handsCount + '</span>';
                 html += '<span class="session-duration">' + formatTime(session.duration) + '</span>';
-                html += '<span class="session-limit">NL' + sessionAvgLimit + '</span>';
                 html += '<span class="session-result ' + sessionClass + '">' + (convertedSessionResult < 0 ? '-' : '') + currencySymbol + Math.abs(convertedSessionResult).toFixed(2) + '</span>';
                 html += '</div>';
             }
@@ -958,6 +1105,43 @@ function updateDayList(selectedLimits = []) {
     }
 
     container.innerHTML = html;
+
+    // Добавляем обработчик клика на заголовок
+    const header = document.getElementById('dayListHeader');
+    if (header) {
+        header.addEventListener('click', function() {
+            // Собираем данные
+            const rows = [];
+            
+            for (const day of filteredDays) {
+                const avgLimit = calculateAverageLimitForDay(day);
+                const timeMinutes = (day.totalTime / 60).toFixed(2).replace('.', ',');
+                
+                rows.push([
+                    avgLimit,
+                    day.totalHands,
+                    timeMinutes
+                ]);
+            }
+            
+            // Создаем TSV (Tab Separated Values) для Google Sheets
+            const tsv = rows.map(row => row.join('\t')).join('\n');
+            
+            // Копируем в буфер обмена
+            navigator.clipboard.writeText(tsv).then(function() {
+                showNotification('✅ Данные скопированы!', 'success');
+            }).catch(function() {
+                // Фолбэк для старых браузеров
+                const textarea = document.createElement('textarea');
+                textarea.value = tsv;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showNotification('✅ Данные скопированы!', 'success');
+            });
+        });
+    }
 
     container.querySelectorAll('.day-item').forEach(function(item) {
         item.addEventListener('click', function() {
@@ -1048,7 +1232,7 @@ function initChart() {
                 backgroundColor: 'rgba(66, 153, 225, 0.1)',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 6,
+                pointRadius: 4,
                 pointHoverRadius: 8,
                 pointBackgroundColor: '#4299e1',
                 pointBorderColor: '#ffffff',
@@ -1118,11 +1302,11 @@ function updateChart() {
     // КОНВЕРТИРУЕМ
     const convertedTotalResult = convertCurrency(totalResult);
     
-    const chartColor = convertedTotalResult > 0 ? '#48bb78' : convertedTotalResult < 0 ? '#fc8181' : '#4299e1';
     
-    AppState.chart.data.datasets[0].borderColor = chartColor;
     AppState.chart.data.datasets[0].backgroundColor = convertedTotalResult > 0 ? 'rgba(72, 187, 120, 0.1)' : convertedTotalResult < 0 ? 'rgba(252, 129, 129, 0.1)' : 'rgba(66, 153, 225, 0.1)';
-    AppState.chart.data.datasets[0].pointBackgroundColor = chartColor;
+    AppState.chart.data.datasets[0].pointBackgroundColor = AppState.chart.data.datasets[0].data.map(value => 
+    value < 0 ? '#fc8181' : '#48bb78'
+);
     
     AppState.chart.update();
 }
@@ -1181,7 +1365,7 @@ function getSelectedLimits() {
 }
 
 function updateChartByHands(hands) {
-    const chunkSize = Math.max(1, Math.floor(hands.length / 10));
+    const chunkSize = Math.max(1, Math.floor(hands.length / 20));
     const labels = [];
     const data = [];
     let cumulative = 0;
@@ -1195,12 +1379,12 @@ function updateChartByHands(hands) {
             return sum + (player ? calculateResult(h.players, hero) : 0);
         }, 0);
         
-        // Конвертируем в выбранную валюту
-        const convertedChunkResult = convertCurrency(chunkResult);
-        cumulative += convertedChunkResult;
+        // Сначала накапливаем чистый итог в системной валюте (EUR)
+        cumulative += chunkResult;
 
         labels.push(String(i + 1));
-        data.push(cumulative);
+        // Конвертируем в выбранную валюту ТОЛЬКО финальную точку перед выводом на график
+        data.push(convertCurrency(cumulative));
     }
 
     AppState.chart.data.labels = labels;
@@ -1208,26 +1392,44 @@ function updateChartByHands(hands) {
     AppState.chart.update();
 }
 
+
 function updateChartByDays(hands) {
     const days = {};
+    const hero = document.getElementById('playerSelect').value;
+    const aliases = AppState.dataManager.aliases || [];
+    
+    const dayStartHour = AppState.dataManager.settings.dayStartHour || 0;
 
     for (const hand of hands) {
-        const hero = document.getElementById('playerSelect').value;
-        const aliases = AppState.dataManager.aliases || [];
         const player = hand.players.find(p => p.name === hero || aliases.includes(p.name));
         if (!player) continue;
 
-        const dayKey = hand.startDate.toISOString().split('T')[0];
+        // Корректируем дату по таймзоне
+        const correctedDate = new Date(hand.startDate);
+        correctedDate.setHours(correctedDate.getHours() + (AppState.dataManager.settings.timezoneOffset || 0));
+        
+        // Получаем ключ дня с учетом "Начала дня" (например, 06:00) через DataManager
+        const dayKey = AppState.dataManager.getDayKey(correctedDate, dayStartHour);
+        
         if (!days[dayKey]) {
             days[dayKey] = { result: 0, count: 0 };
         }
-        days[dayKey].result += player.result;
+        
+        const result = calculateResult(hand.players, hero);
+        days[dayKey].result += result;
         days[dayKey].count++;
     }
 
     const sortedDays = Object.keys(days).sort();
     const labels = sortedDays.map(d => formatDate(d));
-    const data = sortedDays.map(d => days[d].result);
+    const data = [];
+    
+    // Считаем кумулятивный (нарастающий) итог по дням, чтобы график шел вверх/вниз корректно
+    let cumulative = 0;
+    for (const d of sortedDays) {
+        cumulative += convertCurrency(days[d].result);
+        data.push(cumulative);
+    }
 
     AppState.chart.data.labels = labels;
     AppState.chart.data.datasets[0].data = data;
@@ -1246,6 +1448,13 @@ function getCurrencySymbol() {
         rub: '₽'
     };
     return symbols[mode] || '€';
+}
+
+function getCorrectedDate(date) {
+    const offset = AppState.dataManager.settings.timezoneOffset || 0;
+    const corrected = new Date(date);
+    corrected.setHours(corrected.getHours() + offset);
+    return corrected;
 }
 
 function saveCurrencyRates() {
@@ -1318,6 +1527,7 @@ function showNotification(message, type) {
     updateNotificationPositions();
     
     setTimeout(function() {
+
         notification.style.opacity = '0';
         notification.style.transform = 'translateX(100px)';
         
@@ -1357,6 +1567,19 @@ function updateNotificationPositions() {
         
         notification.style.bottom = positionFromBottom + 'px';
     }
+}
+
+// Самостоятельная глобальная утилита для форматирования дат
+function formatDate(dateInput) {
+    if (!dateInput) return '';
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return String(dateInput);
+    
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    
+    return `${day}.${month}.${year}`;
 }
 
 // ============================================================

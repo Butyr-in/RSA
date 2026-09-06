@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
     sessionBreakMinutes: 5,
     currency: 'EUR',
     theme: 'light',
+    timezoneOffset: 0,  // Смещение в часах для отображения
     currencyRates: {
         USD: 1.10,
         EUR: 1.00,
