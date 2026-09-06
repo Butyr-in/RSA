@@ -86,7 +86,7 @@ function loadSettings() {
 
     AppState.theme = settings.theme || 'light';
     applyTheme(AppState.theme);
-    updateThemeIcon(); // Добавляем обновление иконки
+    updateThemeIcon();
 
     const dayStartHours = Math.floor(settings.dayStartHour);
     const dayStartMinutes = (settings.dayStartHour % 1) * 60;
@@ -134,10 +134,8 @@ function toggleTheme() {
     AppState.theme = nextTheme;
     applyTheme(nextTheme);
     
-    // Сохраняем в настройках
     AppState.dataManager.updateSettings({ theme: nextTheme });
     
-    // Обновляем иконку
     updateThemeIcon();
     
     showNotification('🎨 Тема: ' + getThemeName(nextTheme), 'info');
@@ -153,7 +151,6 @@ function getThemeName(theme) {
     return names[theme] || theme;
 }
 
-// Обновление иконки темы
 // Обновление иконки темы
 function updateThemeIcon() {
     const btn = document.getElementById('themeToggle');
@@ -172,7 +169,7 @@ function updateThemeIcon() {
 function updatePlayerList() {
     const nicks = AppState.dataManager.getAllNicks();
     const select = document.getElementById('playerSelect');
-    const currentValue = AppState.dataManager.heroNick || select.value; // Используем сохранённого игрока
+    const currentValue = AppState.dataManager.heroNick || select.value;
 
     select.innerHTML = '<option value="">Выберите игрока</option>';
 
@@ -183,7 +180,6 @@ function updatePlayerList() {
         select.appendChild(option);
     }
 
-    // Если есть сохранённый игрок, восстанавливаем его
     if (AppState.dataManager.heroNick) {
         select.value = AppState.dataManager.heroNick;
     } else if (currentValue && nicks.includes(currentValue)) {
@@ -207,7 +203,7 @@ function updateLimitFilter() {
 
     // Загружаем сохранённые лимиты из localStorage
     let selectedLimits = new Set();
-    let allSelected = true; // По умолчанию выбраны все
+    let allSelected = true;
     
     try {
         const saved = localStorage.getItem('pokerSelectedLimits');
@@ -227,16 +223,13 @@ function updateLimitFilter() {
         console.error('Error loading selected limits:', e);
     }
 
-    // Перестраиваем чекбоксы
     container.innerHTML = '';
     
-    // Добавляем чекбокс "Все"
     const allLabel = document.createElement('label');
     allLabel.className = 'checkbox-label';
     allLabel.innerHTML = '<input type="checkbox" value="all"> Все';
     container.appendChild(allLabel);
     
-    // Добавляем чекбоксы для каждого лимита
     for (const limit of sortedLimits) {
         const label = document.createElement('label');
         label.className = 'checkbox-label';
@@ -244,17 +237,14 @@ function updateLimitFilter() {
         container.appendChild(label);
     }
 
-    // Применяем сохранённое состояние
     const allCheckbox = container.querySelector('input[value="all"]');
     
     if (allSelected) {
-        // Выбраны все
         allCheckbox.checked = true;
         container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
             if (cb.value !== 'all') cb.checked = true;
         });
     } else {
-        // Выбраны конкретные лимиты или ничего
         allCheckbox.checked = false;
         container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
             if (selectedLimits.has(cb.value)) {
@@ -269,7 +259,6 @@ function updateLimitFilter() {
 // ============================================================
 
 function setupEvents() {
-    // Обработчик выбора игрока
     document.getElementById('playerSelect').addEventListener('change', function() {
         const nick = this.value;
         AppState.dataManager.setHero(nick, AppState.dataManager.aliases);
@@ -277,13 +266,11 @@ function setupEvents() {
         updateChart();
     });
 
-    // Обработчик кнопки алиасов
     document.getElementById('aliasBtn').addEventListener('click', function() {
         document.getElementById('aliasInput').value = (AppState.dataManager.aliases || []).join(', ');
         openModal('aliasModal');
     });
 
-    // Обработчик сохранения алиасов
     document.getElementById('saveAliases').addEventListener('click', function() {
         const input = document.getElementById('aliasInput').value;
         const aliases = input.split(',').map(s => s.trim()).filter(s => s);
@@ -294,87 +281,72 @@ function setupEvents() {
         closeModal('aliasModal');
     });
 
-    // Обработчик отмены алиасов
     document.getElementById('cancelAliases').addEventListener('click', function() {
         closeModal('aliasModal');
     });
 
-    // Обработчик закрытия модалки алиасов
     document.getElementById('aliasModalClose').addEventListener('click', function() {
         closeModal('aliasModal');
     });
 
-    // Обработчик переключения темы
     document.getElementById('themeToggle').addEventListener('click', function() {
         toggleTheme();
     });
 
-    // Обработчик кнопки импорта
     document.getElementById('importBtn').addEventListener('click', function() {
         openModal('importModal');
     });
 
-    // Обработчик закрытия модалки импорта
     document.getElementById('importModalClose').addEventListener('click', function() {
         closeModal('importModal');
     });
 
-    // Настройка зоны перетаскивания
     setupDropZone();
 
-    // Обработчик кнопки выбора файлов
     document.getElementById('selectFilesBtn').addEventListener('click', function() {
         document.getElementById('fileInput').click();
     });
 
-    // Обработчик кнопки выбора папки
     document.getElementById('selectFolderBtn').addEventListener('click', function() {
         document.getElementById('folderInput').click();
     });
 
-    // Обработчик изменения файлов
     document.getElementById('fileInput').addEventListener('change', function(e) {
         handleFiles(e.target.files);
         this.value = '';
     });
 
-    // Обработчик изменения папки
     document.getElementById('folderInput').addEventListener('change', function(e) {
         handleFiles(e.target.files);
         this.value = '';
     });
 
-// Обработчик кнопки сброса
-document.getElementById('resetBtn').addEventListener('click', async function() {
-    if (confirm('Вы уверены, что хотите удалить все данные?')) {
-        await AppState.dataManager.clearAll();
-        
-        localStorage.removeItem('pokerSelectedLimits');
-        localStorage.removeItem('pokerAllSelected');
-        
-        updateUI();
-        updateChart();
-        updatePlayerList(); // ← Этот метод перезаписывает селект
-        updateLimitFilter();
-        
-        // Восстанавливаем игрока ПОСЛЕ обновления списка
-        if (AppState.dataManager.heroNick) {
-            document.getElementById('playerSelect').value = AppState.dataManager.heroNick;
-            AppState.dataManager.initAfterHeroSelection();
+    document.getElementById('resetBtn').addEventListener('click', async function() {
+        if (confirm('Вы уверены, что хотите удалить все данные?')) {
+            await AppState.dataManager.clearAll();
+            localStorage.removeItem('pokerSelectedLimits');
+            localStorage.removeItem('pokerAllSelected');
+            
+            updateUI();
+            updateChart();
+            updatePlayerList();
+            updateLimitFilter();
+            
+            if (AppState.dataManager.heroNick) {
+                document.getElementById('playerSelect').value = AppState.dataManager.heroNick;
+                AppState.dataManager.initAfterHeroSelection();
+            }
+            
+            showNotification('✅ Раздачи удалены', 'success');
         }
-        
-        showNotification('✅ Раздачи удалены', 'success');
-    }
-});
+    });
 
-    // ОБРАБОТЧИК ИЗМЕНЕНИЯ ЧЕКБОКСОВ ЛИМИТОВ (ДОБАВЛЕН)
     document.getElementById('limitFilter').addEventListener('change', function(e) {
         if (e.target.type === 'checkbox') {
             handleLimitFilterChange(e);
         }
     });
 
-    // Обработчики виджетов (переключение режимов)
     document.querySelectorAll('.widget').forEach(function(widget) {
         widget.addEventListener('click', function() {
             const type = this.dataset.widget;
@@ -382,7 +354,6 @@ document.getElementById('resetBtn').addEventListener('click', async function() {
         });
     });
 
-    // Обработчики кнопок графика
     document.querySelectorAll('.chart-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.chart-btn').forEach(function(b) {
@@ -394,19 +365,16 @@ document.getElementById('resetBtn').addEventListener('click', async function() {
         });
     });
 
-    // Обработчик изменения даты начала
     document.getElementById('dateStart').addEventListener('change', function() {
         AppState.dateStart = this.value;
         updateChart();
     });
 
-    // Обработчик изменения даты окончания
     document.getElementById('dateEnd').addEventListener('change', function() {
         AppState.dateEnd = this.value;
         updateChart();
     });
 
-    // Обработчик очистки фильтра дат
     document.getElementById('clearDateFilter').addEventListener('click', function() {
         AppState.dateStart = null;
         AppState.dateEnd = null;
@@ -415,7 +383,6 @@ document.getElementById('resetBtn').addEventListener('click', async function() {
         updateChart();
     });
 
-    // Обработчик изменения начала дня
     document.getElementById('dayStart').addEventListener('change', function() {
         const parts = this.value.split(':').map(Number);
         AppState.dataManager.updateSettings({
@@ -425,7 +392,6 @@ document.getElementById('resetBtn').addEventListener('click', async function() {
         updateDayList();
     });
 
-    // Обработчик изменения разрыва сессий
     document.getElementById('sessionBreak').addEventListener('change', function() {
         const minutes = parseInt(this.value) || 5;
         AppState.dataManager.updateSettings({
@@ -434,32 +400,27 @@ document.getElementById('resetBtn').addEventListener('click', async function() {
         updateDayList();
     });
 
-    // Обработчик кнопки обновления курсов
     document.getElementById('updateRatesBtn').addEventListener('click', function() {
         fetchExchangeRates();
     });
 
-    // Обработчики изменения курсов валют
     document.getElementById('usdRate').addEventListener('change', saveCurrencyRates);
     document.getElementById('rubRate').addEventListener('change', saveCurrencyRates);
 
-    // Обработчик клика по затемнению
     document.getElementById('overlay').addEventListener('click', function() {
         closeAllModals();
     });
 
-    // Обработчик клавиши Escape
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             closeAllModals();
         }
     });
 
-    // Обработчик кнопки "Готово"
-document.getElementById('closeImportBtn').addEventListener('click', function() {
-    closeModal('importModal');
-    hideProgress();
-});
+    document.getElementById('closeImportBtn').addEventListener('click', function() {
+        closeModal('importModal');
+        hideProgress();
+    });
 }
 
 // Обработка изменения чекбоксов лимитов
@@ -468,43 +429,34 @@ function handleLimitFilterChange(e) {
     const checkboxes = container.querySelectorAll('input[type="checkbox"]');
     const allCheckbox = container.querySelector('input[value="all"]');
     
-    // Если нажали "Все"
     if (e.target.value === 'all') {
         if (allCheckbox.checked) {
-            // Отмечаем все чекбоксы
             checkboxes.forEach(cb => {
                 if (cb.value !== 'all') cb.checked = true;
             });
-            // Сохраняем, что выбраны все
             localStorage.setItem('pokerAllSelected', 'true');
             localStorage.setItem('pokerSelectedLimits', '[]');
         } else {
-            // Снимаем все чекбоксы
             checkboxes.forEach(cb => {
                 if (cb.value !== 'all') cb.checked = false;
             });
-            // Сохраняем, что ничего не выбрано
             localStorage.setItem('pokerAllSelected', 'false');
             localStorage.setItem('pokerSelectedLimits', '[]');
         }
     } else {
-        // Если нажали на конкретный лимит
         const checkedSpecific = Array.from(checkboxes).filter(cb => 
             cb.value !== 'all' && cb.checked
         );
         
         if (checkedSpecific.length === 0) {
-            // Если ничего не выбрано
             allCheckbox.checked = false;
             localStorage.setItem('pokerAllSelected', 'false');
             localStorage.setItem('pokerSelectedLimits', '[]');
         } else if (checkedSpecific.length === checkboxes.length - 1) {
-            // Если выбраны все конкретные, отмечаем "Все"
             allCheckbox.checked = true;
             localStorage.setItem('pokerAllSelected', 'true');
             localStorage.setItem('pokerSelectedLimits', '[]');
         } else {
-            // Иначе снимаем "Все" и сохраняем выбранные
             allCheckbox.checked = false;
             const selectedLimits = checkedSpecific.map(cb => cb.value);
             localStorage.setItem('pokerAllSelected', 'false');
@@ -512,8 +464,8 @@ function handleLimitFilterChange(e) {
         }
     }
     
-    updateUI(); // Обновляем виджеты и список дней
-    updateChart(); // Обновляем график
+    updateUI();
+    updateChart();
 }
 
 function saveSelectedLimits() {
@@ -707,34 +659,38 @@ async function handleFiles(fileList) {
         updateProgress('parsing', 'Обработка файлов...', progress, allFiles.length, processed);
     }
 
-    // Переходим к этапу сохранения
     updateProgress('saving', 'Сохранение данных...', 100);
 
-    // Сохраняем все раздачи в IndexedDB
     const result = await AppState.dataManager.addHands(allHands);
 
-    // После обновления счётчиков
-document.getElementById('totalHandsFound').textContent = allHands.length;
-document.getElementById('newHandsAdded').textContent = result.added;
-document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
+    document.getElementById('totalHandsFound').textContent = allHands.length;
+    document.getElementById('newHandsAdded').textContent = result.added;
+    document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
 
-// Останавливаем анимацию
-stopProgressAnimation();
-
-// Показываем кнопку "Готово"
-// После завершения импорта
-document.getElementById('progressActions').style.display = 'flex';
-document.getElementById('progressStage').textContent = '✅ Готово!';
-document.getElementById('progressFill').style.width = '100%';
-document.getElementById('progressPercentage').textContent = '100%';
-
-// Обновляем данные
-updatePlayerList();
-updateLimitFilter();
-updateUI();
-updateChart();
-
+    hideProgress();
     AppState.isProcessing = false;
+
+    if (result.added > 0) {
+        showNotification('✅ Добавлено ' + result.added + ' новых раздач (' + result.duplicates + ' пропущено дублей)', 'success');
+        
+        // Обновляем список игроков
+        updatePlayerList();
+        updateLimitFilter();
+        
+        // Если герой уже выбран, пересчитываем статистику
+        if (AppState.dataManager.heroNick) {
+            AppState.dataManager.recalculateStats();
+            updateUI();
+            updateChart();
+        } else {
+            // Если герой не выбран, показываем подсказку
+            showNotification('👤 Выберите героя из списка', 'info');
+        }
+    } else {
+        showNotification('ℹ️ Новых раздач не найдено (' + result.duplicates + ' уже загружены)', 'info');
+    }
+
+    closeModal('importModal');
 }
 
 async function extractArchive(file) {
@@ -772,10 +728,6 @@ function showProgress() {
     document.getElementById('newHandsAdded').textContent = '0';
     document.getElementById('duplicateHandsSkipped').textContent = '0';
     
-    // Запускаем анимацию
-    startProgressAnimation();
-    
-    // Скрываем кнопку "Готово" при старте
     document.getElementById('progressActions').style.display = 'none';
 }
 
@@ -800,10 +752,6 @@ function hideProgress() {
     document.getElementById('progressContainer').classList.add('hidden');
     document.getElementById('progressFill').style.width = '0%';
     
-    // Перезапускаем анимацию при следующем показе
-    startProgressAnimation();
-    
-    // Скрываем кнопку "Готово"
     document.getElementById('progressActions').style.display = 'none';
 }
 
@@ -860,7 +808,6 @@ function calculateBB100(stats) {
     const hands = stats.totalHands;
     const netResult = stats.netResult || 0;
     
-    // bb/100 = (результат / (лимит * руки)) * 100
     return (netResult / (bb * hands)) * 100;
 }
 
@@ -911,61 +858,40 @@ function updateWidgets(stats) {
     }
 
     // ===== ЭФФЕКТИВНОСТЬ =====
-const efficiencyValue = document.getElementById('efficiencyValue');
-const efficiencyDetails = document.getElementById('efficiencyDetails');
-
-if (widgets.efficiency === 'bb100') {
-    const bb100 = calculateBB100(stats);
-    efficiencyValue.textContent = bb100.toFixed(1) + ' bb/100';
-    efficiencyValue.className = 'widget-value ' + (bb100 > 0 ? 'positive' : bb100 < 0 ? 'negative' : '');
-    efficiencyDetails.textContent = 'Винрейт';
-} else {
-    const hourly = calculateHourlyIncome(stats);
-    const formattedHourly = (hourly < 0 ? '-' : '') + currencySymbol + Math.abs(hourly).toFixed(2) + '/час';
-    efficiencyValue.textContent = formattedHourly;
-    efficiencyValue.className = 'widget-value ' + (hourly > 0 ? 'positive' : hourly < 0 ? 'negative' : '');
-    efficiencyDetails.textContent = 'Доход в час';
-}
+    if (widgets.efficiency === 'bb100') {
+        const bb100 = calculateBB100(stats);
+        efficiencyValue.textContent = bb100.toFixed(1) + ' bb/100';
+        efficiencyValue.className = 'widget-value ' + (bb100 > 0 ? 'positive' : bb100 < 0 ? 'negative' : '');
+        efficiencyDetails.textContent = 'Винрейт';
+    } else {
+        const hourly = calculateHourlyIncome(stats);
+        const convertedHourly = convertCurrency(hourly);
+        const formattedHourly = (convertedHourly < 0 ? '-' : '') + currencySymbol + Math.abs(convertedHourly).toFixed(2) + '/час';
+        efficiencyValue.textContent = formattedHourly;
+        efficiencyValue.className = 'widget-value ' + (convertedHourly > 0 ? 'positive' : convertedHourly < 0 ? 'negative' : '');
+        efficiencyDetails.textContent = 'Доход в час';
+    }
 
     // ===== ОБЩИЙ РЕЗУЛЬТАТ =====
-const result = stats.netResult || 0;
-const formattedResult = (result < 0 ? '-' : '') + currencySymbol + Math.abs(result).toFixed(2);
-document.getElementById('netResult').textContent = formattedResult;
-document.getElementById('netResult').className = 'widget-value ' + (result > 0 ? 'positive' : result < 0 ? 'negative' : '');
+    const result = stats.netResult || 0;
+    const convertedResult = convertCurrency(result);
+    const formattedResult = (convertedResult < 0 ? '-' : '') + currencySymbol + Math.abs(convertedResult).toFixed(2);
+    document.getElementById('netResult').textContent = formattedResult;
+    document.getElementById('netResult').className = 'widget-value ' + (convertedResult > 0 ? 'positive' : convertedResult < 0 ? 'negative' : '');
 }
 
-// ============================================================
-// РАСЧЁТ СРЕДНЕГО ЛИМИТА
-// ============================================================
-
-// Расчёт среднего лимита для дня
-function calculateAverageLimitForDay(day) {
-    if (!day.hands || day.hands.length === 0) return 0;
+function convertCurrency(amount) {
+    const rates = AppState.dataManager.settings.currencyRates || {};
+    const mode = AppState.widgetModes.result;
     
-    let totalHands = 0;
-    let weightedSum = 0;
-    
-    for (const hand of day.hands) {
-        totalHands++;
-        weightedSum += hand.limit;
+    if (mode === 'usd') {
+        return amount * (rates.USD || 1.10);
+    } else if (mode === 'rub') {
+        return amount * (rates.RUB || 90.00);
     }
     
-    return Math.round(weightedSum / totalHands);
-}
-
-// Расчёт среднего лимита для сессии
-function calculateAverageLimitForSession(session) {
-    if (!session.hands || session.hands.length === 0) return 0;
-    
-    let totalHands = 0;
-    let weightedSum = 0;
-    
-    for (const hand of session.hands) {
-        totalHands++;
-        weightedSum += hand.limit;
-    }
-    
-    return Math.round(weightedSum / totalHands);
+    // EUR (по умолчанию)
+    return amount;
 }
 
 // ============================================================
@@ -987,7 +913,6 @@ function updateDayList(selectedLimits = []) {
         return;
     }
 
-    // Создаём шапку
     let html = '<div class="day-list-header">';
     html += '<span>День</span>';
     html += '<span>Раздачи</span>';
@@ -998,97 +923,33 @@ function updateDayList(selectedLimits = []) {
 
     for (const day of days) {
         const isExpanded = AppState.expandedDay === day.day;
-        const resultClass = day.netResult >= 0 ? 'positive' : 'negative';
+        const resultClass = day.netResult > 0 ? 'positive' : day.netResult < 0 ? 'negative' : '';
         const avgLimit = calculateAverageLimitForDay(day);
+        
+        const convertedDayResult = convertCurrency(day.netResult);
 
         html += '<div class="day-item" data-day="' + day.day + '">';
         html += '<span class="day-date">' + formatDate(day.day) + '</span>';
         html += '<span class="hands-count">' + day.totalHands + '</span>';
         html += '<span class="time">' + formatTime(day.totalTime) + '</span>';
         html += '<span class="limit">NL' + avgLimit + '</span>';
-        html += '<span class="result ' + resultClass + '">' + (day.netResult < 0 ? '-' : '') + currencySymbol + Math.abs(day.netResult).toFixed(2) + '</span>';
+        html += '<span class="result ' + resultClass + '">' + (convertedDayResult < 0 ? '-' : '') + currencySymbol + Math.abs(convertedDayResult).toFixed(2) + '</span>';
         html += '</div>';
 
         html += '<div class="day-sessions' + (isExpanded ? '' : ' hidden') + '" id="sessions-' + day.day + '">';
 
         if (isExpanded) {
             for (const session of day.sessions) {
-                const sessionClass = session.netResult >= 0 ? 'positive' : 'negative';
+                const sessionClass = session.netResult > 0 ? 'positive' : session.netResult < 0 ? 'negative' : '';
                 const sessionAvgLimit = calculateAverageLimitForSession(session);
+                const convertedSessionResult = convertCurrency(session.netResult);
 
                 html += '<div class="session-item">';
                 html += '<span class="session-time">' + formatTimeSession(session.startTime, session.endTime) + '</span>';
                 html += '<span class="session-hands">' + session.handsCount + '</span>';
                 html += '<span class="session-duration">' + formatTime(session.duration) + '</span>';
                 html += '<span class="session-limit">NL' + sessionAvgLimit + '</span>';
-                html += '<span class="session-result ' + sessionClass + '">' + (session.netResult < 0 ? '-' : '') + currencySymbol + Math.abs(session.netResult).toFixed(2) + '</span>';
-                html += '</div>';
-            }
-        }
-
-        html += '</div>';
-    }
-
-    container.innerHTML = html;
-
-    container.querySelectorAll('.day-item').forEach(function(item) {
-        item.addEventListener('click', function() {
-            const dayKey = this.dataset.day;
-            toggleDay(dayKey);
-        });
-    });
-}
-
-function updateDayList(selectedLimits = []) {
-    const days = AppState.dataManager.getDays({
-        dayStartHour: AppState.dataManager.settings.dayStartHour,
-        sessionBreakMinutes: AppState.dataManager.settings.sessionBreakMinutes,
-        limits: selectedLimits
-    });
-
-    const container = document.getElementById('dayList');
-    const currencySymbol = getCurrencySymbol();
-
-    if (days.length === 0) {
-        container.innerHTML = '<div class="empty-state">Нет данных для отображения</div>';
-        return;
-    }
-
-    // Создаём шапку
-    let html = '<div class="day-list-header">';
-    html += '<span>День</span>';
-    html += '<span>Раздачи</span>';
-    html += '<span>Время</span>';
-    html += '<span>Лимит</span>';
-    html += '<span>Результат</span>';
-    html += '</div>';
-
-    for (const day of days) {
-        const isExpanded = AppState.expandedDay === day.day;
-        const resultClass = day.netResult >= 0 ? 'positive' : 'negative';
-        const avgLimit = calculateAverageLimitForDay(day);
-
-        html += '<div class="day-item" data-day="' + day.day + '">';
-        html += '<span class="day-date">' + formatDate(day.day) + '</span>';
-        html += '<span class="hands-count">' + day.totalHands + '</span>';
-        html += '<span class="time">' + formatTime(day.totalTime) + '</span>';
-        html += '<span class="limit">NL' + avgLimit + '</span>';
-        html += '<span class="result ' + resultClass + '">' + (day.netResult < 0 ? '-' : '') + currencySymbol + Math.abs(day.netResult).toFixed(2) + '</span>';
-        html += '</div>';
-
-        html += '<div class="day-sessions' + (isExpanded ? '' : ' hidden') + '" id="sessions-' + day.day + '">';
-
-        if (isExpanded) {
-            for (const session of day.sessions) {
-                const sessionClass = session.netResult >= 0 ? 'positive' : 'negative';
-                const sessionAvgLimit = calculateAverageLimitForSession(session);
-
-                html += '<div class="session-item">';
-                html += '<span class="session-time">' + formatTimeSession(session.startTime, session.endTime) + '</span>';
-                html += '<span class="session-hands">' + session.handsCount + '</span>';
-                html += '<span class="session-duration">' + formatTime(session.duration) + '</span>';
-                html += '<span class="session-limit">NL' + sessionAvgLimit + '</span>';
-                html += '<span class="session-result ' + sessionClass + '">' + (session.netResult < 0 ? '-' : '') + currencySymbol + Math.abs(session.netResult).toFixed(2) + '</span>';
+                html += '<span class="session-result ' + sessionClass + '">' + (convertedSessionResult < 0 ? '-' : '') + currencySymbol + Math.abs(convertedSessionResult).toFixed(2) + '</span>';
                 html += '</div>';
             }
         }
@@ -1113,6 +974,38 @@ function toggleDay(dayKey) {
         AppState.expandedDay = dayKey;
     }
     updateDayList();
+}
+
+// ============================================================
+// РАСЧЁТ СРЕДНЕГО ЛИМИТА
+// ============================================================
+
+function calculateAverageLimitForDay(day) {
+    if (!day.hands || day.hands.length === 0) return 0;
+    
+    let totalHands = 0;
+    let weightedSum = 0;
+    
+    for (const hand of day.hands) {
+        totalHands++;
+        weightedSum += hand.limit;
+    }
+    
+    return Math.round(weightedSum / totalHands);
+}
+
+function calculateAverageLimitForSession(session) {
+    if (!session.hands || session.hands.length === 0) return 0;
+    
+    let totalHands = 0;
+    let weightedSum = 0;
+    
+    for (const hand of session.hands) {
+        totalHands++;
+        weightedSum += hand.limit;
+    }
+    
+    return Math.round(weightedSum / totalHands);
 }
 
 // ============================================================
@@ -1155,8 +1048,8 @@ function initChart() {
                 backgroundColor: 'rgba(66, 153, 225, 0.1)',
                 fill: true,
                 tension: 0.4,
-                pointRadius: 6,        // Размер точек
-                pointHoverRadius: 8,   // Размер при наведении
+                pointRadius: 6,
+                pointHoverRadius: 8,
                 pointBackgroundColor: '#4299e1',
                 pointBorderColor: '#ffffff',
                 pointBorderWidth: 2
@@ -1209,19 +1102,26 @@ function updateChart() {
         return;
     }
 
-    // Определяем цвет по последнему значению
     if (AppState.currentView === 'hands') {
         updateChartByHands(filteredHands);
     } else {
         updateChartByDays(filteredHands);
     }
 
-    // Меняем цвет линии в зависимости от общего результата
-    const totalResult = filteredHands.reduce((sum, h) => sum + h.result, 0);
-    const chartColor = totalResult >= 0 ? '#48bb78' : '#fc8181';
+    const totalResult = filteredHands.reduce((sum, h) => {
+        const hero = document.getElementById('playerSelect').value;
+        const aliases = AppState.dataManager.aliases || [];
+        const player = h.players.find(p => p.name === hero || aliases.includes(p.name));
+        return sum + (player ? calculateResult(h.players, hero) : 0);
+    }, 0);
+    
+    // КОНВЕРТИРУЕМ
+    const convertedTotalResult = convertCurrency(totalResult);
+    
+    const chartColor = convertedTotalResult > 0 ? '#48bb78' : convertedTotalResult < 0 ? '#fc8181' : '#4299e1';
     
     AppState.chart.data.datasets[0].borderColor = chartColor;
-    AppState.chart.data.datasets[0].backgroundColor = totalResult >= 0 ? 'rgba(72, 187, 120, 0.1)' : 'rgba(252, 129, 129, 0.1)';
+    AppState.chart.data.datasets[0].backgroundColor = convertedTotalResult > 0 ? 'rgba(72, 187, 120, 0.1)' : convertedTotalResult < 0 ? 'rgba(252, 129, 129, 0.1)' : 'rgba(66, 153, 225, 0.1)';
     AppState.chart.data.datasets[0].pointBackgroundColor = chartColor;
     
     AppState.chart.update();
@@ -1241,21 +1141,17 @@ function filterHands(hands) {
         filtered = filtered.filter(h => new Date(h.startDate) <= end);
     }
 
-    // Фильтрация по лимитам (чекбоксы)
     const limitContainer = document.getElementById('limitFilter');
     const allCheckbox = limitContainer.querySelector('input[value="all"]');
     
-    // Если "Все" НЕ отмечено, фильтруем по выбранным лимитам
     if (!allCheckbox.checked) {
         const checkedLimits = Array.from(limitContainer.querySelectorAll('input[type="checkbox"]:checked'))
             .map(cb => cb.value)
             .filter(v => v !== 'all');
         
-        // Если есть выбранные лимиты, фильтруем по ним
         if (checkedLimits.length > 0) {
             filtered = filtered.filter(h => checkedLimits.includes('NL' + h.limit));
         } else {
-            // Если ничего не выбрано - показываем пустой результат
             filtered = [];
         }
     }
@@ -1263,7 +1159,9 @@ function filterHands(hands) {
     const hero = document.getElementById('playerSelect').value;
     if (hero) {
         const aliases = AppState.dataManager.aliases || [];
-        filtered = filtered.filter(h => h.heroName === hero || aliases.includes(h.heroName));
+        filtered = filtered.filter(h => {
+            return h.players.some(p => p.name === hero || aliases.includes(p.name));
+        });
     }
 
     return filtered;
@@ -1273,12 +1171,10 @@ function getSelectedLimits() {
     const limitContainer = document.getElementById('limitFilter');
     const allCheckbox = limitContainer.querySelector('input[value="all"]');
     
-    // Если "Все" отмечено, возвращаем пустой массив (значит все лимиты)
     if (allCheckbox.checked) {
         return [];
     }
     
-    // Иначе возвращаем выбранные лимиты
     return Array.from(limitContainer.querySelectorAll('input[type="checkbox"]:checked'))
         .map(cb => cb.value)
         .filter(v => v !== 'all');
@@ -1292,10 +1188,18 @@ function updateChartByHands(hands) {
 
     for (let i = 0; i < hands.length; i += chunkSize) {
         const chunk = hands.slice(i, i + chunkSize);
-        const chunkResult = chunk.reduce((sum, h) => sum + h.result, 0);
-        cumulative += chunkResult;
+        const chunkResult = chunk.reduce((sum, h) => {
+            const hero = document.getElementById('playerSelect').value;
+            const aliases = AppState.dataManager.aliases || [];
+            const player = h.players.find(p => p.name === hero || aliases.includes(p.name));
+            return sum + (player ? calculateResult(h.players, hero) : 0);
+        }, 0);
+        
+        // Конвертируем в выбранную валюту
+        const convertedChunkResult = convertCurrency(chunkResult);
+        cumulative += convertedChunkResult;
 
-        labels.push(String(i + 1));  // Убираем #, просто число
+        labels.push(String(i + 1));
         data.push(cumulative);
     }
 
@@ -1308,11 +1212,16 @@ function updateChartByDays(hands) {
     const days = {};
 
     for (const hand of hands) {
+        const hero = document.getElementById('playerSelect').value;
+        const aliases = AppState.dataManager.aliases || [];
+        const player = hand.players.find(p => p.name === hero || aliases.includes(p.name));
+        if (!player) continue;
+
         const dayKey = hand.startDate.toISOString().split('T')[0];
         if (!days[dayKey]) {
             days[dayKey] = { result: 0, count: 0 };
         }
-        days[dayKey].result += hand.result;
+        days[dayKey].result += player.result;
         days[dayKey].count++;
     }
 
@@ -1381,7 +1290,6 @@ async function fetchExchangeRates() {
 // УТИЛИТЫ
 // ============================================================
 
-// Хранилище активных уведомлений
 const activeNotifications = [];
 
 function showNotification(message, type) {
@@ -1405,25 +1313,20 @@ function showNotification(message, type) {
 
     document.body.appendChild(notification);
     
-    // Добавляем в хранилище
     activeNotifications.push(notification);
     
-    // Обновляем позиции всех уведомлений
     updateNotificationPositions();
     
-    // Автоматическое скрытие через 3 секунды
     setTimeout(function() {
         notification.style.opacity = '0';
         notification.style.transform = 'translateX(100px)';
         
         setTimeout(function() {
             notification.remove();
-            // Удаляем из хранилища
             const index = activeNotifications.indexOf(notification);
             if (index > -1) {
                 activeNotifications.splice(index, 1);
             }
-            // Обновляем позиции оставшихся
             updateNotificationPositions();
         }, 500);
     }, 3000);
@@ -1443,12 +1346,10 @@ function showNotification(message, type) {
     });
 }
 
-// Обновление позиций уведомлений (стек снизу вверх)
 function updateNotificationPositions() {
     const bottomOffset = 20;
     const gap = 10;
     
-    // Проходим по уведомлениям снизу вверх
     for (let i = activeNotifications.length - 1; i >= 0; i--) {
         const notification = activeNotifications[i];
         const height = notification.offsetHeight;
@@ -1462,6 +1363,4 @@ function updateNotificationPositions() {
 // ЗАПУСК ПРИЛОЖЕНИЯ
 // ============================================================
 
-// DOM уже загружен, так как скрипт находится в конце body
 initApp();
-

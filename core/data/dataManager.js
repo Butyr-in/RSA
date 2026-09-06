@@ -157,7 +157,6 @@ class DataManager {
         this.isLoaded = false;
         this.isSaving = false;
         
-        // Загружаем сохранённого героя
         this.loadHero();
     }
 
@@ -233,63 +232,49 @@ class DataManager {
     }
 
     async addHands(newHands) {
-    const existingCodes = new Set(this.hands.map(h => h.gamecode));
-    const uniqueNewHands = newHands.filter(h => !existingCodes.has(h.gamecode));
+        const existingCodes = new Set(this.hands.map(h => h.gamecode));
+        const uniqueNewHands = newHands.filter(h => !existingCodes.has(h.gamecode));
 
-    if (uniqueNewHands.length === 0) {
-        return { added: 0, duplicates: newHands.length };
+        if (uniqueNewHands.length === 0) {
+            return { added: 0, duplicates: newHands.length };
+        }
+
+        this.hands = this.hands.concat(uniqueNewHands);
+        await this.saveHands();
+
+        if (this.heroNick) {
+            this.recalculateStats();
+        }
+
+        return {
+            added: uniqueNewHands.length,
+            duplicates: newHands.length - uniqueNewHands.length
+        };
     }
-
-    this.hands = this.hands.concat(uniqueNewHands);
-    await this.saveHands();
-
-    // Не пересчитываем статистику, пока не выбран игрок
-    if (this.heroNick) {
-        this.recalculateStats();
-    }
-
-    return {
-        added: uniqueNewHands.length,
-        duplicates: newHands.length - uniqueNewHands.length
-    };
-}
 
     recalculateStats() {
-    this.calculator.reset();
+        this.calculator.reset();
 
-    const heroHands = this.hands.filter(hand => {
-        const isHero = hand.heroName === this.heroNick;
-        const isAlias = this.aliases.some(alias => hand.heroName === alias);
-        
-        // Если heroName пустой, проверяем players
-        if (!isHero && !isAlias && hand.players) {
-            return hand.players.some(p => p.name === this.heroNick || this.aliases.includes(p.name));
-        }
-        
-        return isHero || isAlias;
-    });
+        const heroHands = this.hands.filter(hand => {
+            return hand.players && hand.players.some(p => p.name === this.heroNick || this.aliases.includes(p.name));
+        });
 
-    heroHands.sort((a, b) => a.startDate - b.startDate);
+        heroHands.sort((a, b) => a.startDate - b.startDate);
 
-    for (const hand of heroHands) {
-        // Если heroName пустой, но игрок есть в players - обновляем
-        if (!hand.heroName) {
-            const player = hand.players.find(p => p.name === this.heroNick);
+        for (const hand of heroHands) {
+            const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
             if (player) {
-                hand.heroName = this.heroNick;
-                hand.win = player.win;
-                hand.totalInvested = hand.actions
-                    .filter(a => a.player === this.heroNick)
-                    .reduce((sum, a) => sum + a.sum, 0);
-                hand.result = hand.win - hand.totalInvested;
+                // Используем calculateResult вместо calculateTotalInvested
+                const result = calculateResult(hand.players, this.heroNick);
+                this.calculator.addHand({
+                    ...hand,
+                    result: result
+                });
             }
         }
-        
-        this.calculator.addHand(hand);
-    }
 
-    this.stats = this.calculator.getStats(this.settings?.sessionBreakMinutes || 5);
-}
+        this.stats = this.calculator.getStats(this.settings?.sessionBreakMinutes || 5);
+    }
 
     getStats(filters = {}) {
         if (!this.stats) {
@@ -307,7 +292,14 @@ class DataManager {
 
             const tempCalculator = new StatsCalculator();
             for (const hand of filteredHands) {
-                tempCalculator.addHand(hand);
+                const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
+                if (player) {
+                    const result = calculateResult(hand.players, this.heroNick);
+                    tempCalculator.addHand({
+                        ...hand,
+                        result: result
+                    });
+                }
             }
             stats = tempCalculator.getStats(breakMinutes);
         }
@@ -322,7 +314,14 @@ class DataManager {
 
             const tempCalculator = new StatsCalculator();
             for (const hand of filteredHands) {
-                tempCalculator.addHand(hand);
+                const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
+                if (player) {
+                    const result = calculateResult(hand.players, this.heroNick);
+                    tempCalculator.addHand({
+                        ...hand,
+                        result: result
+                    });
+                }
             }
             stats = tempCalculator.getStats(breakMinutes);
         }
@@ -331,62 +330,58 @@ class DataManager {
     }
 
     getDays(settings = {}) {
-    const dayStartHour = settings.dayStartHour || this.settings.dayStartHour;
-    const sessionBreak = settings.sessionBreakMinutes || this.settings.sessionBreakMinutes;
-    const selectedLimits = settings.limits || [];
+        const dayStartHour = settings.dayStartHour || this.settings.dayStartHour;
+        const sessionBreak = settings.sessionBreakMinutes || this.settings.sessionBreakMinutes;
 
-    const heroHands = this.hands.filter(hand => {
-        const isHero = hand.heroName === this.heroNick;
-        const isAlias = this.aliases.some(alias => hand.heroName === alias);
-        return isHero || isAlias;
-    });
-
-    // Фильтруем по лимитам, если они выбраны
-    let filteredHands = heroHands;
-    if (selectedLimits.length > 0) {
-        filteredHands = heroHands.filter(hand => {
-            return selectedLimits.includes('NL' + hand.limit);
+        const heroHands = this.hands.filter(hand => {
+            return hand.players && hand.players.some(p => p.name === this.heroNick || this.aliases.includes(p.name));
         });
-    }
 
-    const daysMap = {};
+        const daysMap = {};
 
-    for (const hand of filteredHands) {
-        const date = new Date(hand.startDate);
-        const dayKey = this.getDayKey(date, dayStartHour);
+        for (const hand of heroHands) {
+            const player = hand.players.find(p => p.name === this.heroNick || this.aliases.includes(p.name));
+            if (!player) continue;
 
-        if (!daysMap[dayKey]) {
-            daysMap[dayKey] = {
-                date: dayKey,
-                hands: [],
-                netResult: 0
-            };
+            const date = new Date(hand.startDate);
+            const dayKey = this.getDayKey(date, dayStartHour);
+
+            if (!daysMap[dayKey]) {
+                daysMap[dayKey] = {
+                    date: dayKey,
+                    hands: [],
+                    netResult: 0
+                };
+            }
+
+            const result = calculateResult(hand.players, this.heroNick);
+            daysMap[dayKey].hands.push({
+                ...hand,
+                result: result
+            });
+            daysMap[dayKey].netResult += result;
         }
 
-        daysMap[dayKey].hands.push(hand);
-        daysMap[dayKey].netResult += hand.result;
+        const result = [];
+        for (const dayKey in daysMap) {
+            const dayData = daysMap[dayKey];
+            const sortedHands = dayData.hands.slice().sort((a, b) => a.startDate - b.startDate);
+            const sessions = this.groupIntoSessions(sortedHands, sessionBreak);
+
+            result.push({
+                day: dayKey,
+                hands: sortedHands,
+                sessions: sessions,
+                netResult: dayData.netResult,
+                totalHands: sortedHands.length,
+                totalTime: sessions.reduce((sum, s) => sum + s.duration, 0)
+            });
+        }
+
+        result.sort((a, b) => a.day.localeCompare(b.day));
+
+        return result;
     }
-
-    const result = [];
-    for (const dayKey in daysMap) {
-        const dayData = daysMap[dayKey];
-        const sortedHands = dayData.hands.slice().sort((a, b) => a.startDate - b.startDate);
-        const sessions = this.groupIntoSessions(sortedHands, sessionBreak);
-
-        result.push({
-            day: dayKey,
-            hands: sortedHands,
-            sessions: sessions,
-            netResult: dayData.netResult,
-            totalHands: sortedHands.length,
-            totalTime: sessions.reduce((sum, s) => sum + s.duration, 0)
-        });
-    }
-
-    result.sort((a, b) => a.day.localeCompare(b.day));
-
-    return result;
-}
 
     getDayKey(date, dayStartHour) {
         const d = new Date(date);
@@ -457,38 +452,20 @@ class DataManager {
     }
 
     setHero(nick, aliases = []) {
-    this.heroNick = nick;
-    this.aliases = aliases;
-    
-    // Обновляем heroName и результат в раздачах
-    this.hands.forEach(hand => {
-        const player = hand.players.find(p => p.name === nick);
-        if (player) {
-            hand.heroName = nick;
-            hand.win = player.win;
-            
-            // Вычисляем totalInvested из actions для этого игрока
-            hand.totalInvested = 0;
-            const heroActions = hand.actions.filter(a => a.player === nick);
-            for (const action of heroActions) {
-                if (action.type === ACTION_TYPES.SB || 
-                    action.type === ACTION_TYPES.BB || 
-                    action.type === ACTION_TYPES.CALL || 
-                    action.type === ACTION_TYPES.ALLIN) {
-                    hand.totalInvested += action.sum;
-                } else if (action.type === ACTION_TYPES.BET || action.type === ACTION_TYPES.RAISE) {
-                    hand.totalInvested += action.sum;
-                }
-            }
-            
-            hand.result = hand.win - hand.totalInvested;
+        this.heroNick = nick;
+        this.aliases = aliases;
+        
+        try {
+            localStorage.setItem('pokerHeroNick', nick);
+            localStorage.setItem('pokerHeroAliases', JSON.stringify(aliases));
+        } catch (e) {
+            console.error('Error saving hero to localStorage:', e);
         }
-    });
-    
-    if (this.hands.length > 0) {
-        this.recalculateStats();
+        
+        if (this.hands.length > 0) {
+            this.recalculateStats();
+        }
     }
-}
 
     clearHero() {
         this.heroNick = '';

@@ -15,7 +15,7 @@ function cleanSum(sumStr) {
     return isNaN(result) ? 0 : result;
 }
 
-// ===== ПАРСИМ ВСЕ РАЗДАЧИ БЕЗ ФИЛЬТРА ПО ИГРОКУ =====
+// ===== ПАРСИМ ВСЕ РАЗДАЧИ =====
 function parseAllHands(xmlString) {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
@@ -27,112 +27,10 @@ function parseAllHands(xmlString) {
     }
 
     const gameNodes = xmlDoc.querySelectorAll('game');
-    console.log('📊 Найдено game узлов:', gameNodes.length);
-    
-    if (gameNodes.length === 0) {
-        console.log('❌ Нет узлов <game>! Проверьте структуру XML.');
-        return [];
-    }
-
     const hands = [];
 
     for (let i = 0; i < gameNodes.length; i++) {
-        const gameNode = gameNodes[i];
-        const gamecode = gameNode.getAttribute('gamecode');
-        if (!gamecode) {
-            console.log('⚠️ Пропущен game #' + i + ' - нет gamecode');
-            continue;
-        }
-
-        const generalNode = gameNode.querySelector('general');
-        if (!generalNode) {
-            console.log('⚠️ Пропущен game #' + i + ' - нет general');
-            continue;
-        }
-
-        const startDate = generalNode.querySelector('startdate')?.textContent;
-        if (!startDate) {
-            console.log('⚠️ Пропущен game #' + i + ' - нет startdate');
-            continue;
-        }
-
-        const playersNode = generalNode.querySelector('players');
-        if (!playersNode) {
-            console.log('⚠️ Пропущен game #' + i + ' - нет players');
-            continue;
-        }
-
-        const playerNodes = playersNode.querySelectorAll('player');
-        if (playerNodes.length === 0) {
-            console.log('⚠️ Пропущен game #' + i + ' - нет player');
-            continue;
-        }
-
-        // Находим большого блайнда
-        let bigBlind = 0;
-        const round0 = gameNode.querySelector('round[no="0"]');
-        if (round0) {
-            const actions0 = round0.querySelectorAll('action');
-            for (let a = 0; a < actions0.length; a++) {
-                const action = actions0[a];
-                const type = parseInt(action.getAttribute('type'));
-                if (type === ACTION_TYPES.BB) {
-                    bigBlind = cleanSum(action.getAttribute('sum'));
-                    break;
-                }
-            }
-        }
-
-        const actions = parseActions(gameNode, '');
-        const totalPlayers = playerNodes.length;
-
-        // Создаём объект раздачи
-        const hand = {
-            gamecode: gamecode,
-            startDate: parseDateTime(startDate),
-            heroName: '',
-            heroCards: null,
-            heroPosition: '',
-            totalPlayers: totalPlayers,
-            bigBlind: bigBlind,
-            limit: Math.round(bigBlind * 100),
-            totalInvested: 0,
-            win: 0,
-            result: 0,
-            wentToShowdown: false,
-            actions: actions,
-            players: Array.from(playerNodes).map(p => ({
-                name: p.getAttribute('name'),
-                isHero: false,
-                seat: parseInt(p.getAttribute('seat') || 0),
-                bet: cleanSum(p.getAttribute('bet')),
-                win: cleanSum(p.getAttribute('win'))
-            }))
-        };
-
-        hands.push(hand);
-    }
-
-    console.log('✅ Всего раздач:', hands.length);
-    return hands;
-}
-
-// ===== ПАРСИМ XML ДЛЯ КОНКРЕТНОГО ИГРОКА =====
-function parseXMLFile(xmlString, heroNick) {
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
-
-    const parseError = xmlDoc.querySelector('parsererror');
-    if (parseError) {
-        console.error('XML parsing error:', parseError.textContent);
-        return null;
-    }
-
-    const gameNodes = xmlDoc.querySelectorAll('game');
-    const hands = [];
-
-    for (let i = 0; i < gameNodes.length; i++) {
-        const hand = parseGame(gameNodes[i], heroNick);
+        const hand = parseGame(gameNodes[i]);
         if (hand) {
             hands.push(hand);
         }
@@ -141,7 +39,8 @@ function parseXMLFile(xmlString, heroNick) {
     return hands;
 }
 
-function parseGame(gameNode, heroNick) {
+// ===== ПАРСИМ ОДНУ РАЗДАЧУ =====
+function parseGame(gameNode) {
     const gamecode = gameNode.getAttribute('gamecode');
     if (!gamecode) return null;
 
@@ -155,113 +54,52 @@ function parseGame(gameNode, heroNick) {
     if (!playersNode) return null;
 
     const playerNodes = playersNode.querySelectorAll('player');
-    const players = [];
-    let heroPlayer = null;
-    let heroIndex = -1;
-    let win = 0;
+    if (playerNodes.length === 0) return null;
 
-    for (let i = 0; i < playerNodes.length; i++) {
-        const node = playerNodes[i];
-        const name = node.getAttribute('name');
-        const chips = cleanSum(node.getAttribute('chips'));
-        const playerWin = cleanSum(node.getAttribute('win'));
-        const bet = cleanSum(node.getAttribute('bet'));
-
-        const player = {
-            name: name,
-            chips: chips,
-            win: playerWin,
-            bet: bet,
-            seat: parseInt(node.getAttribute('seat') || 0),
-            isHero: name === heroNick
-        };
-
-        players.push(player);
-
-        if (player.isHero) {
-            heroPlayer = player;
-            heroIndex = i;
-            win = playerWin;
-        }
-    }
-
-    if (!heroPlayer) return null;
-
-    // Поиск большого блайнда
+    // Находим большого блайнда
     let bigBlind = 0;
-    
-    // Попытка найти BB в атрибуте general
-    const generalBB = generalNode.getAttribute('bb');
-    if (generalBB) {
-        bigBlind = cleanSum(generalBB);
-    } else {
-        // Если нет, ищем в round 0
-        const round0 = gameNode.querySelector('round[no="0"]');
-        if (round0) {
-            const actions0 = round0.querySelectorAll('action');
-            for (let a = 0; a < actions0.length; a++) {
-                const action = actions0[a];
-                const type = parseInt(action.getAttribute('type'));
-                const sum = cleanSum(action.getAttribute('sum'));
-                
-                // BB обычно ставится первым и его тип = 2 (BB)
-                if (type === ACTION_TYPES.BB) {
-                    bigBlind = sum;
-                    break;
-                }
+    const round0 = gameNode.querySelector('round[no="0"]');
+    if (round0) {
+        const actions0 = round0.querySelectorAll('action');
+        for (let a = 0; a < actions0.length; a++) {
+            const action = actions0[a];
+            const type = parseInt(action.getAttribute('type'));
+            if (type === ACTION_TYPES.BB) {
+                bigBlind = cleanSum(action.getAttribute('sum'));
+                break;
             }
         }
     }
 
-    const pocketCardsNode = gameNode.querySelector('cards[type="Pocket"][player="' + heroNick + '"]');
-    let heroCards = null;
-    if (pocketCardsNode) {
-        const cardsText = pocketCardsNode.textContent.trim();
-        if (cardsText !== 'X X') {
-            heroCards = cardsText;
-        }
-    }
-
-    const actions = parseActions(gameNode, heroNick);
-    const totalInvested = calculateInvestment(actions);
-
-    const totalPlayers = players.length;
-    const heroPosition = getPosition(heroIndex, totalPlayers);
-
-    let wentToShowdown = false;
-    const riverNode = gameNode.querySelector('round[no="4"]');
-    if (riverNode) {
-        const heroActionsAfterRiver = riverNode.querySelectorAll('action[player="' + heroNick + '"]');
-        wentToShowdown = heroActionsAfterRiver.length > 0;
-    }
-
-    const result = win - totalInvested;
+    // Парсим все действия
+    const actions = parseActions(gameNode);
+    
+    // Парсим игроков
+    const players = Array.from(playerNodes).map(node => {
+        const name = node.getAttribute('name');
+        const win = cleanSum(node.getAttribute('win'));
+        const bet = cleanSum(node.getAttribute('bet'));
+        const rake = cleanSum(node.getAttribute('rakeamount'));
+        
+        return {
+            name: name,
+            win: win,
+            bet: bet,
+            rake: rake
+        };
+    });
 
     return {
         gamecode: gamecode,
         startDate: parseDateTime(startDate),
-        heroName: heroNick,
-        heroCards: heroCards,
-        heroPosition: heroPosition,
-        totalPlayers: totalPlayers,
-        bigBlind: bigBlind,
         limit: Math.round(bigBlind * 100),
-        totalInvested: totalInvested,
-        win: win,
-        result: result,
-        wentToShowdown: wentToShowdown,
-        actions: actions,
-        players: players.map(p => ({
-            name: p.name,
-            isHero: p.isHero,
-            seat: p.seat,
-            bet: p.bet,
-            win: p.win
-        }))
+        players: players,
+        actions: actions
     };
 }
 
-function parseActions(gameNode, heroNick) {
+// ===== ПАРСИМ ДЕЙСТВИЯ =====
+function parseActions(gameNode) {
     const allActions = [];
     const roundNodes = gameNode.querySelectorAll('round');
 
@@ -280,8 +118,7 @@ function parseActions(gameNode, heroNick) {
                 player: player,
                 type: type,
                 sum: sum,
-                round: roundNo,
-                isHero: player === heroNick
+                round: roundNo
             });
         }
     }
@@ -289,38 +126,45 @@ function parseActions(gameNode, heroNick) {
     return allActions;
 }
 
-function calculateInvestment(actions) {
-    let totalInvested = 0;
-    const heroActions = actions.filter(a => a.isHero);
-
-    for (let i = 0; i < heroActions.length; i++) {
-        const action = heroActions[i];
-        const type = action.type;
-        const sum = action.sum;
-
-        if (type === ACTION_TYPES.SB || type === ACTION_TYPES.BB) {
-            totalInvested += sum;
-            continue;
-        }
-
-        if (type === ACTION_TYPES.CALL || type === ACTION_TYPES.ALLIN) {
-            totalInvested += sum;
-            continue;
-        }
-
-        if (type === ACTION_TYPES.BET || type === ACTION_TYPES.RAISE) {
-            const currentRound = action.round;
-            const nextActions = actions.filter(a => {
-                return a.round === currentRound &&
-                    a.player !== action.player &&
-                    a.type !== ACTION_TYPES.FOLD;
-            });
-
-            if (nextActions.length > 0) {
-                totalInvested += sum;
-            }
-        }
+// ===== ВЫЧИСЛЕНИЕ РЕЗУЛЬТАТА ИГРОКА =====
+function calculateResult(players, playerName) {
+    const player = players.find(p => p.name === playerName);
+    if (!player) return 0;
+    
+    const win = player.win;
+    const bet = player.bet;
+    
+    // Если игрок выиграл
+    if (win > 0) {
+        // Ищем победителя (игрока с win > 0)
+        const winner = players.find(p => p.win > 0);
+        
+        // Rake победителя
+        const rake = winner ? winner.rake : 0;
+        
+        // Сумма bet всех оппонентов
+        const opponentsBet = players
+            .filter(p => p.name !== playerName)
+            .reduce((sum, p) => sum + p.bet, 0);
+        
+        // Наше вложение
+        const ourInvested = win + rake - opponentsBet;
+        
+        return win - ourInvested;
+    } else {
+        // Если игрок проиграл
+        return -bet;
     }
+}
 
-    return totalInvested;
+// ===== ПАРСИМ ДАТЫ =====
+function parseDateTime(dateStr) {
+    const parts = dateStr.split(' ');
+    const datePart = parts[0];
+    const timePart = parts[1];
+
+    const dateParts = datePart.split('-').map(Number);
+    const timeParts = timePart.split(':').map(Number);
+
+    return new Date(dateParts[2], dateParts[0] - 1, dateParts[1], timeParts[0], timeParts[1], timeParts[2]);
 }
