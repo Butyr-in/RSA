@@ -405,6 +405,7 @@ if (progressStats) {
         AppState.dataManager.updateSettings({
             sessionBreakMinutes: minutes
         });
+        updateUI();
         updateDayList();
     });
 
