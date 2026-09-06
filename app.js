@@ -9,7 +9,6 @@ const AppState = {
     dateEnd: null,
     expandedDay: null,
     widgetModes: {
-        limit: 'average',
         hands: 'total',
         time: 'hours',
         efficiency: 'bb100',
@@ -455,6 +454,12 @@ document.getElementById('resetBtn').addEventListener('click', async function() {
             closeAllModals();
         }
     });
+
+    // Обработчик кнопки "Готово"
+document.getElementById('closeImportBtn').addEventListener('click', function() {
+    closeModal('importModal');
+    hideProgress();
+});
 }
 
 // Обработка изменения чекбоксов лимитов
@@ -685,12 +690,11 @@ async function handleFiles(fileList) {
 
     const allHands = [];
     let processed = 0;
-    const heroNick = AppState.dataManager.heroNick || 'GNKTABACCO';
 
     for (const file of allFiles) {
         try {
             const content = await file.text();
-            const hands = parseXMLFile(content, heroNick);
+            const hands = parseAllHands(content);
             if (hands && hands.length > 0) {
                 allHands.push(...hands);
             }
@@ -703,33 +707,28 @@ async function handleFiles(fileList) {
         updateProgress('parsing', 'Обработка файлов...', progress, allFiles.length, processed);
     }
 
+    // Переходим к этапу сохранения
     updateProgress('saving', 'Сохранение данных...', 100);
 
+    // Сохраняем все раздачи в IndexedDB
     const result = await AppState.dataManager.addHands(allHands);
 
-    document.getElementById('totalHandsFound').textContent = allHands.length;
-    document.getElementById('newHandsAdded').textContent = result.added;
-    document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
+    // После обновления счётчиков
+document.getElementById('totalHandsFound').textContent = allHands.length;
+document.getElementById('newHandsAdded').textContent = result.added;
+document.getElementById('duplicateHandsSkipped').textContent = result.duplicates;
 
-    hideProgress();
+// Останавливаем анимацию
+stopProgressAnimation();
+
+// Показываем кнопку "Готово"
+document.getElementById('progressActions').style.display = 'flex';
+document.getElementById('progressActions').style.justifyContent = 'center';
+document.getElementById('progressStage').textContent = '✅ Готово!';
+document.getElementById('progressFill').style.width = '100%';
+document.getElementById('progressPercentage').textContent = '100%';
+
     AppState.isProcessing = false;
-
-    if (result.added > 0) {
-        showNotification('✅ Добавлено ' + result.added + ' новых рук (' + result.duplicates + ' пропущено дублей)', 'success');
-        
-        updatePlayerList();
-        if (!AppState.dataManager.heroNick) {
-            showNotification('👤 Выберите игрока из списка', 'info');
-        }
-        
-        updateUI();
-        updateChart();
-        updateLimitFilter();
-    } else {
-        showNotification('ℹ️ Новых рук не найдено (' + result.duplicates + ' уже загружены)', 'info');
-    }
-
-    closeModal('importModal');
 }
 
 async function extractArchive(file) {
@@ -766,6 +765,12 @@ function showProgress() {
     document.getElementById('totalHandsFound').textContent = '0';
     document.getElementById('newHandsAdded').textContent = '0';
     document.getElementById('duplicateHandsSkipped').textContent = '0';
+    
+    // Запускаем анимацию
+    startProgressAnimation();
+    
+    // Скрываем кнопку "Готово" при старте
+    document.getElementById('progressActions').style.display = 'none';
 }
 
 function updateProgress(stage, message, percent, total, processed) {
@@ -788,6 +793,22 @@ function updateProgress(stage, message, percent, total, processed) {
 function hideProgress() {
     document.getElementById('progressContainer').classList.add('hidden');
     document.getElementById('progressFill').style.width = '0%';
+    
+    // Перезапускаем анимацию при следующем показе
+    startProgressAnimation();
+    
+    // Скрываем кнопку "Готово"
+    document.getElementById('progressActions').style.display = 'none';
+}
+
+function stopProgressAnimation() {
+    const progressFill = document.getElementById('progressFill');
+    progressFill.style.animation = 'none';
+}
+
+function startProgressAnimation() {
+    const progressFill = document.getElementById('progressFill');
+    progressFill.style.animation = 'shimmer 2s infinite';
 }
 
 // ============================================================
@@ -855,15 +876,6 @@ function updateWidgets(stats) {
     const widgets = AppState.widgetModes;
     const currencySymbol = getCurrencySymbol();
 
-    // ===== ЛИМИТ =====
-    if (widgets.limit === 'average') {
-        document.getElementById('avgLimit').textContent = 'NL' + (stats.averageLimit || 0);
-        document.getElementById('favoriteLimit').textContent = 'Средний';
-    } else {
-        document.getElementById('avgLimit').textContent = stats.favoriteLimit || 'NL0';
-        document.getElementById('favoriteLimit').textContent = 'Любимый';
-    }
-
     // ===== РАЗДАЧИ =====
     const totalHands = stats.totalHands || 0;
     
@@ -887,7 +899,8 @@ function updateWidgets(stats) {
         document.getElementById('totalTime').textContent = formatTime(stats.totalTime || 0);
         document.getElementById('totalTimeMinutes').textContent = 'Часы';
     } else {
-        document.getElementById('totalTime').textContent = formatMinutes(stats.totalTime || 0);
+        const minutes = Math.round((stats.totalTime || 0) / 60);
+        document.getElementById('totalTime').textContent = minutes + ' мин';
         document.getElementById('totalTimeMinutes').textContent = 'Минуты';
     }
 
@@ -902,19 +915,122 @@ function updateWidgets(stats) {
         efficiencyDetails.textContent = 'Винрейт';
     } else {
         const hourly = calculateHourlyIncome(stats);
-        efficiencyValue.textContent = currencySymbol + hourly.toFixed(2) + '/час';
+        const formattedHourly = (hourly < 0 ? '-' : '') + currencySymbol + Math.abs(hourly).toFixed(2) + '/час';
+        efficiencyValue.textContent = formattedHourly;
         efficiencyValue.className = 'widget-value ' + (hourly >= 0 ? 'positive' : 'negative');
         efficiencyDetails.textContent = 'Доход в час';
     }
 
     // ===== ОБЩИЙ РЕЗУЛЬТАТ =====
     const result = stats.netResult || 0;
-    document.getElementById('netResult').textContent = currencySymbol + result.toFixed(2);
+    const formattedResult = (result < 0 ? '-' : '') + currencySymbol + Math.abs(result).toFixed(2);
+    document.getElementById('netResult').textContent = formattedResult;
     document.getElementById('netResult').className = 'widget-value ' + (result >= 0 ? 'positive' : 'negative');
+}
+
+// ============================================================
+// РАСЧЁТ СРЕДНЕГО ЛИМИТА
+// ============================================================
+
+// Расчёт среднего лимита для дня
+function calculateAverageLimitForDay(day) {
+    if (!day.hands || day.hands.length === 0) return 0;
     
-    const wonHands = stats.totalWon || 0;
-    const lostHands = stats.totalLost || 0;
-    document.getElementById('resultDetails').textContent = wonHands + ' выиграно / ' + lostHands + ' проиграно';
+    let totalHands = 0;
+    let weightedSum = 0;
+    
+    for (const hand of day.hands) {
+        totalHands++;
+        weightedSum += hand.limit;
+    }
+    
+    return Math.round(weightedSum / totalHands);
+}
+
+// Расчёт среднего лимита для сессии
+function calculateAverageLimitForSession(session) {
+    if (!session.hands || session.hands.length === 0) return 0;
+    
+    let totalHands = 0;
+    let weightedSum = 0;
+    
+    for (const hand of session.hands) {
+        totalHands++;
+        weightedSum += hand.limit;
+    }
+    
+    return Math.round(weightedSum / totalHands);
+}
+
+// ============================================================
+// ОБНОВЛЕНИЕ СПИСКА ДНЕЙ
+// ============================================================
+
+function updateDayList(selectedLimits = []) {
+    const days = AppState.dataManager.getDays({
+        dayStartHour: AppState.dataManager.settings.dayStartHour,
+        sessionBreakMinutes: AppState.dataManager.settings.sessionBreakMinutes,
+        limits: selectedLimits
+    });
+
+    const container = document.getElementById('dayList');
+    const currencySymbol = getCurrencySymbol();
+
+    if (days.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет данных для отображения</div>';
+        return;
+    }
+
+    // Создаём шапку
+    let html = '<div class="day-list-header">';
+    html += '<span>День</span>';
+    html += '<span>Раздачи</span>';
+    html += '<span>Время</span>';
+    html += '<span>Лимит</span>';
+    html += '<span>Результат</span>';
+    html += '</div>';
+
+    for (const day of days) {
+        const isExpanded = AppState.expandedDay === day.day;
+        const resultClass = day.netResult >= 0 ? 'positive' : 'negative';
+        const avgLimit = calculateAverageLimitForDay(day);
+
+        html += '<div class="day-item" data-day="' + day.day + '">';
+        html += '<span class="day-date">' + formatDate(day.day) + '</span>';
+        html += '<span class="hands-count">' + day.totalHands + '</span>';
+        html += '<span class="time">' + formatTime(day.totalTime) + '</span>';
+        html += '<span class="limit">NL' + avgLimit + '</span>';
+        html += '<span class="result ' + resultClass + '">' + (day.netResult < 0 ? '-' : '') + currencySymbol + Math.abs(day.netResult).toFixed(2) + '</span>';
+        html += '</div>';
+
+        html += '<div class="day-sessions' + (isExpanded ? '' : ' hidden') + '" id="sessions-' + day.day + '">';
+
+        if (isExpanded) {
+            for (const session of day.sessions) {
+                const sessionClass = session.netResult >= 0 ? 'positive' : 'negative';
+                const sessionAvgLimit = calculateAverageLimitForSession(session);
+
+                html += '<div class="session-item">';
+                html += '<span class="session-time">' + formatTimeSession(session.startTime, session.endTime) + '</span>';
+                html += '<span class="session-hands">' + session.handsCount + '</span>';
+                html += '<span class="session-duration">' + formatTime(session.duration) + '</span>';
+                html += '<span class="session-limit">NL' + sessionAvgLimit + '</span>';
+                html += '<span class="session-result ' + sessionClass + '">' + (session.netResult < 0 ? '-' : '') + currencySymbol + Math.abs(session.netResult).toFixed(2) + '</span>';
+                html += '</div>';
+            }
+        }
+
+        html += '</div>';
+    }
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.day-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+            const dayKey = this.dataset.day;
+            toggleDay(dayKey);
+        });
+    });
 }
 
 function updateDayList(selectedLimits = []) {
@@ -932,41 +1048,52 @@ function updateDayList(selectedLimits = []) {
         return;
     }
 
-    let html = '';
+    // Создаём шапку
+    let html = '<div class="day-list-header">';
+    html += '<span>День</span>';
+    html += '<span>Раздачи</span>';
+    html += '<span>Время</span>';
+    html += '<span>Лимит</span>';
+    html += '<span>Результат</span>';
+    html += '</div>';
 
     for (const day of days) {
         const isExpanded = AppState.expandedDay === day.day;
         const resultClass = day.netResult >= 0 ? 'positive' : 'negative';
+        const avgLimit = calculateAverageLimitForDay(day);
 
-        html += '<div class="day-item">';
-        html += '<div class="day-header" data-day="' + day.day + '">';
+        html += '<div class="day-item" data-day="' + day.day + '">';
         html += '<span class="day-date">' + formatDate(day.day) + '</span>';
-        html += '<div class="day-stats">';
-        html += '<span class="hands-count">' + day.totalHands + ' рук</span>';
+        html += '<span class="hands-count">' + day.totalHands + '</span>';
         html += '<span class="time">' + formatTime(day.totalTime) + '</span>';
-        html += '<span class="result ' + resultClass + '">' + currencySymbol + day.netResult.toFixed(2) + '</span>';
-        html += '</div></div>';
+        html += '<span class="limit">NL' + avgLimit + '</span>';
+        html += '<span class="result ' + resultClass + '">' + (day.netResult < 0 ? '-' : '') + currencySymbol + Math.abs(day.netResult).toFixed(2) + '</span>';
+        html += '</div>';
 
         html += '<div class="day-sessions' + (isExpanded ? '' : ' hidden') + '" id="sessions-' + day.day + '">';
 
         if (isExpanded) {
             for (const session of day.sessions) {
                 const sessionClass = session.netResult >= 0 ? 'positive' : 'negative';
+                const sessionAvgLimit = calculateAverageLimitForSession(session);
+
                 html += '<div class="session-item">';
                 html += '<span class="session-time">' + formatTimeSession(session.startTime, session.endTime) + '</span>';
-                html += '<span class="session-hands">' + session.handsCount + ' рук</span>';
-                html += '<span class="session-result ' + sessionClass + '">' + currencySymbol + session.netResult.toFixed(2) + '</span>';
+                html += '<span class="session-hands">' + session.handsCount + '</span>';
+                html += '<span class="session-duration">' + formatTime(session.duration) + '</span>';
+                html += '<span class="session-limit">NL' + sessionAvgLimit + '</span>';
+                html += '<span class="session-result ' + sessionClass + '">' + (session.netResult < 0 ? '-' : '') + currencySymbol + Math.abs(session.netResult).toFixed(2) + '</span>';
                 html += '</div>';
             }
         }
 
-        html += '</div></div>';
+        html += '</div>';
     }
 
     container.innerHTML = html;
 
-    container.querySelectorAll('.day-header').forEach(function(header) {
-        header.addEventListener('click', function() {
+    container.querySelectorAll('.day-item').forEach(function(item) {
+        item.addEventListener('click', function() {
             const dayKey = this.dataset.day;
             toggleDay(dayKey);
         });
@@ -988,7 +1115,6 @@ function toggleDay(dayKey) {
 
 function toggleWidgetMode(type) {
     const modes = {
-        limit: ['average', 'favorite'],
         hands: ['total', 'perDay', 'perHour'],
         time: ['hours', 'minutes'],
         efficiency: ['bb100', 'hourly'],
@@ -1022,7 +1148,12 @@ function initChart() {
                 borderColor: '#4299e1',
                 backgroundColor: 'rgba(66, 153, 225, 0.1)',
                 fill: true,
-                tension: 0.4
+                tension: 0.4,
+                pointRadius: 6,        // Размер точек
+                pointHoverRadius: 8,   // Размер при наведении
+                pointBackgroundColor: '#4299e1',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2
             }]
         },
         options: {
@@ -1033,14 +1164,25 @@ function initChart() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return context.parsed.y.toFixed(2) + ' €';
+                            const value = context.parsed.y;
+                            const currencySymbol = getCurrencySymbol();
+                            const formatted = (value < 0 ? '-' : '') + currencySymbol + Math.abs(value).toFixed(2);
+                            return formatted;
                         }
                     }
                 }
             },
             scales: {
                 x: { grid: { display: false } },
-                y: { grid: { color: 'rgba(0,0,0,0.05)' } }
+                y: {
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    ticks: {
+                        callback: function(value) {
+                            const currencySymbol = getCurrencySymbol();
+                            return (value < 0 ? '-' : '') + currencySymbol + Math.abs(value);
+                        }
+                    }
+                }
             }
         }
     });
@@ -1061,11 +1203,22 @@ function updateChart() {
         return;
     }
 
+    // Определяем цвет по последнему значению
     if (AppState.currentView === 'hands') {
         updateChartByHands(filteredHands);
     } else {
         updateChartByDays(filteredHands);
     }
+
+    // Меняем цвет линии в зависимости от общего результата
+    const totalResult = filteredHands.reduce((sum, h) => sum + h.result, 0);
+    const chartColor = totalResult >= 0 ? '#48bb78' : '#fc8181';
+    
+    AppState.chart.data.datasets[0].borderColor = chartColor;
+    AppState.chart.data.datasets[0].backgroundColor = totalResult >= 0 ? 'rgba(72, 187, 120, 0.1)' : 'rgba(252, 129, 129, 0.1)';
+    AppState.chart.data.datasets[0].pointBackgroundColor = chartColor;
+    
+    AppState.chart.update();
 }
 
 function filterHands(hands) {
@@ -1136,7 +1289,7 @@ function updateChartByHands(hands) {
         const chunkResult = chunk.reduce((sum, h) => sum + h.result, 0);
         cumulative += chunkResult;
 
-        labels.push('#' + (i + 1));
+        labels.push(String(i + 1));  // Убираем #, просто число
         data.push(cumulative);
     }
 
@@ -1305,3 +1458,4 @@ function updateNotificationPositions() {
 
 // DOM уже загружен, так как скрипт находится в конце body
 initApp();
+

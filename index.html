@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poker Hand Analyzer</title>
+    <title>HR</title>
 
+    <!-- Favicon -->
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    
     <!-- Подключаем шрифт Roboto -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,23 +24,21 @@
         <header class="header">
     <div class="header-left">
         <div class="logo" style="display: inline-flex; align-items: center; gap: 8px;">
-            <a href="index.html" style="text-decoration: none; display: inline-flex; align-items: center; color: inherit;">
-                <img src="favicon.ico" alt="PokerStats" width="32" height="32" style="display: block; flex-shrink: 0;">
-            </a>
-            <span class="logo-text">RS Анализатор</span>
-        </div>
+    <a href="index.html" style="text-decoration: none; display: inline-flex; align-items: center; color: inherit;">
+        <img src="favicon.ico" alt="HR" width="32" height="32" style="display: block; flex-shrink: 0;">
+    </a>
+    <span class="logo-text"></span>
+</div>
         <div class="header-controls">
             <div class="player-selector">
-                <label>Игрок:</label>
-                <select id="playerSelect" class="select">
-                    <option value="">Выберите игрока</option>
-                </select>
-                <button id="aliasBtn" class="btn-icon" title="Алиасы (дополнительные ники)">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm0 2c-2.67 0-8 1.34-8 4v1h16v-1c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                </button>
-            </div>
+    <label>Игрок:</label>
+    <select id="playerSelect" class="select">
+        <option value="">Выберите игрока</option>
+    </select>
+    <button id="aliasBtn" class="btn-icon" title="Алиасы (дополнительные ники)">
+        🥷
+    </button>
+</div>
             <div class="limit-filter">
                 <label>Лимиты:</label>
                 <div id="limitFilter" class="limit-checkboxes">
@@ -66,11 +67,6 @@
 
         <!-- Виджеты -->
 <section class="widgets">
-    <div class="widget" data-widget="limit">
-        <div class="widget-label">Лимит</div>
-        <div class="widget-value" id="avgLimit">NL0</div>
-        <div class="widget-sub" id="favoriteLimit">Средний</div>
-    </div>
     <div class="widget" data-widget="hands">
         <div class="widget-label">Раздачи</div>
         <div class="widget-value" id="totalHands">0</div>
@@ -87,10 +83,9 @@
         <div class="widget-sub" id="efficiencyDetails">Винрейт</div>
     </div>
     <div class="widget" data-widget="result">
-        <div class="widget-label">Общий результат</div>
-        <div class="widget-value" id="netResult">€0.00</div>
-        <div class="widget-sub" id="resultDetails">0 выиграно / 0 проиграно</div>
-    </div>
+    <div class="widget-label">Результат</div>
+    <div class="widget-value" id="netResult">€0.00</div>
+</div>
 </section>
 
         <!-- График -->
@@ -125,9 +120,8 @@
                     <input type="time" id="dayStart" value="06:00" step="60" />
                 </div>
                 <div class="setting-group">
-                    <label>Разрыв сессий:</label>
-                    <input type="number" id="sessionBreak" value="5" min="1" max="60" />
-                    <span>мин</span>
+                    <label>Разрыв (минуты):</label>
+                    <input type="number" id="sessionBreak" value="5" min="0" max="60" />
                 </div>
             </div>
             <div class="footer-center">
@@ -148,9 +142,8 @@
 </div>
             </div>
             <div class="footer-right">
-                <span class="copyright">© Butyrin <span id="currentYear">2026</span></span>
-                <a href="https://t.me/GGPKR" target="_blank" class="telegram-link">📱 Telegram</a>
-            </div>
+    <a href="https://t.me/GGPKR" target="_blank" class="copyright">© Butyrin <span id="currentYear">2026</span></a>
+</div>
         </footer>
     </div>
 
@@ -174,46 +167,46 @@
 
     <!-- Модальное окно импорта -->
     <div id="importModal" class="modal hidden">
-        <div class="modal-content import-modal">
-            <div class="modal-header">
-                <h3>Импорт раздач</h3>
-                <button class="modal-close" id="importModalClose">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="dropZone" class="drop-zone">
-                    <div class="drop-zone-content">
-                        <svg width="48" height="48" viewBox="0 0 48 48" fill="currentColor">
-                            <path d="M24 4a2 2 0 012 2v13.172l4.586-4.586a2 2 0 012.828 2.828L27.657 24l5.757 5.757a2 2 0 01-2.828 2.828L26 26.828V40a2 2 0 01-4 0V26.828l-5.586 5.586a2 2 0 01-2.828-2.828L19.343 24 13.586 18.243a2 2 0 012.828-2.828L22 19.172V6a2 2 0 012-2z"/>
-                        </svg>
-                        <p class="drop-text">Перетащите файлы, папки или архивы сюда</p>
-                        <p class="drop-hint">Поддерживаются .xml, .zip, .rar</p>
-                        <div class="drop-actions">
-                            <button id="selectFilesBtn" class="btn-primary">Выбрать файлы</button>
-                            <button id="selectFolderBtn" class="btn-secondary">Выбрать папку</button>
-                        </div>
+    <div class="modal-content import-modal">
+        <div class="modal-header">
+            <h3>Импорт раздач</h3>
+            <button class="modal-close" id="importModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="dropZone" class="drop-zone">
+                <div class="drop-zone-content">
+                    <p class="drop-text">Перетащите файлы, папки или архивы сюда</p>
+                    <p class="drop-hint">Поддерживаются .xml, .zip, .rar</p>
+                    <div class="drop-actions">
+                        <button id="selectFilesBtn" class="btn-primary">Выбрать файлы</button>
+                        <button id="selectFolderBtn" class="btn-secondary">Выбрать папку</button>
                     </div>
                 </div>
+            </div>
 
-                <div id="progressContainer" class="progress-container hidden">
-                    <div class="progress-stage" id="progressStage">Подготовка...</div>
-                    <div class="progress-bar-wrapper">
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-                            <span class="progress-percentage" id="progressPercentage">0%</span>
-                        </div>
-                    </div>
-                    <div class="progress-details" id="progressDetails">
-                        <span>Файлы: <span id="processedFiles">0</span> / <span id="totalFiles">0</span></span>
-                    </div>
-                    <div class="progress-stats">
-                        <span>📊 Найдено рук: <span id="totalHandsFound">0</span></span>
-                        <span>➕ Добавлено: <span id="newHandsAdded">0</span></span>
-                        <span>⏭ Пропущено дублей: <span id="duplicateHandsSkipped">0</span></span>
-                    </div>
-                </div>
-            </div>
+            <div id="progressContainer" class="progress-container hidden">
+    <div class="progress-stage" id="progressStage">Подготовка...</div>
+    <div class="progress-bar-wrapper">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            <span class="progress-percentage" id="progressPercentage">0%</span>
         </div>
     </div>
+    <div class="progress-details" id="progressDetails">
+        <span>Файлы: <span id="processedFiles">0</span> / <span id="totalFiles">0</span></span>
+    </div>
+    <div class="progress-stats">
+        <span>📊 Найдено раздач: <span id="totalHandsFound">0</span></span>
+        <span>➕ Добавлено: <span id="newHandsAdded">0</span></span>
+        <span>⏭ Пропущено дублей: <span id="duplicateHandsSkipped">0</span></span>
+    </div>
+    <div class="modal-actions" id="progressActions" style="display: none;">
+        <button id="closeImportBtn" class="btn-primary">Готово</button>
+    </div>
+</div>
+        </div>
+    </div>
+</div>
 
     <!-- Затемнение -->
     <div id="overlay" class="overlay hidden"></div>

@@ -233,43 +233,63 @@ class DataManager {
     }
 
     async addHands(newHands) {
-        const existingCodes = new Set(this.hands.map(h => h.gamecode));
-        const uniqueNewHands = newHands.filter(h => !existingCodes.has(h.gamecode));
+    const existingCodes = new Set(this.hands.map(h => h.gamecode));
+    const uniqueNewHands = newHands.filter(h => !existingCodes.has(h.gamecode));
 
-        if (uniqueNewHands.length === 0) {
-            return { added: 0, duplicates: newHands.length };
-        }
-
-        this.hands = this.hands.concat(uniqueNewHands);
-        await this.saveHands();
-
-        if (this.heroNick) {
-            this.recalculateStats();
-        }
-
-        return {
-            added: uniqueNewHands.length,
-            duplicates: newHands.length - uniqueNewHands.length
-        };
+    if (uniqueNewHands.length === 0) {
+        return { added: 0, duplicates: newHands.length };
     }
+
+    this.hands = this.hands.concat(uniqueNewHands);
+    await this.saveHands();
+
+    // Не пересчитываем статистику, пока не выбран игрок
+    if (this.heroNick) {
+        this.recalculateStats();
+    }
+
+    return {
+        added: uniqueNewHands.length,
+        duplicates: newHands.length - uniqueNewHands.length
+    };
+}
 
     recalculateStats() {
-        this.calculator.reset();
+    this.calculator.reset();
 
-        const heroHands = this.hands.filter(hand => {
-            const isHero = hand.heroName === this.heroNick;
-            const isAlias = this.aliases.some(alias => hand.heroName === alias);
-            return isHero || isAlias;
-        });
-
-        heroHands.sort((a, b) => a.startDate - b.startDate);
-
-        for (const hand of heroHands) {
-            this.calculator.addHand(hand);
+    const heroHands = this.hands.filter(hand => {
+        const isHero = hand.heroName === this.heroNick;
+        const isAlias = this.aliases.some(alias => hand.heroName === alias);
+        
+        // Если heroName пустой, проверяем players
+        if (!isHero && !isAlias && hand.players) {
+            return hand.players.some(p => p.name === this.heroNick || this.aliases.includes(p.name));
         }
+        
+        return isHero || isAlias;
+    });
 
-        this.stats = this.calculator.getStats(this.settings?.sessionBreakMinutes || 5);
+    heroHands.sort((a, b) => a.startDate - b.startDate);
+
+    for (const hand of heroHands) {
+        // Если heroName пустой, но игрок есть в players - обновляем
+        if (!hand.heroName) {
+            const player = hand.players.find(p => p.name === this.heroNick);
+            if (player) {
+                hand.heroName = this.heroNick;
+                hand.win = player.win;
+                hand.totalInvested = hand.actions
+                    .filter(a => a.player === this.heroNick)
+                    .reduce((sum, a) => sum + a.sum, 0);
+                hand.result = hand.win - hand.totalInvested;
+            }
+        }
+        
+        this.calculator.addHand(hand);
     }
+
+    this.stats = this.calculator.getStats(this.settings?.sessionBreakMinutes || 5);
+}
 
     getStats(filters = {}) {
         if (!this.stats) {
@@ -437,21 +457,38 @@ class DataManager {
     }
 
     setHero(nick, aliases = []) {
-        this.heroNick = nick;
-        this.aliases = aliases;
-        
-        // Сохраняем в localStorage
-        try {
-            localStorage.setItem('pokerHeroNick', nick);
-            localStorage.setItem('pokerHeroAliases', JSON.stringify(aliases));
-        } catch (e) {
-            console.error('Error saving hero to localStorage:', e);
+    this.heroNick = nick;
+    this.aliases = aliases;
+    
+    // Обновляем heroName и результат в раздачах
+    this.hands.forEach(hand => {
+        const player = hand.players.find(p => p.name === nick);
+        if (player) {
+            hand.heroName = nick;
+            hand.win = player.win;
+            
+            // Вычисляем totalInvested из actions для этого игрока
+            hand.totalInvested = 0;
+            const heroActions = hand.actions.filter(a => a.player === nick);
+            for (const action of heroActions) {
+                if (action.type === ACTION_TYPES.SB || 
+                    action.type === ACTION_TYPES.BB || 
+                    action.type === ACTION_TYPES.CALL || 
+                    action.type === ACTION_TYPES.ALLIN) {
+                    hand.totalInvested += action.sum;
+                } else if (action.type === ACTION_TYPES.BET || action.type === ACTION_TYPES.RAISE) {
+                    hand.totalInvested += action.sum;
+                }
+            }
+            
+            hand.result = hand.win - hand.totalInvested;
         }
-        
-        if (this.hands.length > 0) {
-            this.recalculateStats();
-        }
+    });
+    
+    if (this.hands.length > 0) {
+        this.recalculateStats();
     }
+}
 
     clearHero() {
         this.heroNick = '';

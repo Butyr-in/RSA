@@ -15,6 +15,109 @@ function cleanSum(sumStr) {
     return isNaN(result) ? 0 : result;
 }
 
+// ===== ПАРСИМ ВСЕ РАЗДАЧИ БЕЗ ФИЛЬТРА ПО ИГРОКУ =====
+function parseAllHands(xmlString) {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+
+    const parseError = xmlDoc.querySelector('parsererror');
+    if (parseError) {
+        console.error('XML parsing error:', parseError.textContent);
+        return null;
+    }
+
+    const gameNodes = xmlDoc.querySelectorAll('game');
+    console.log('📊 Найдено game узлов:', gameNodes.length);
+    
+    if (gameNodes.length === 0) {
+        console.log('❌ Нет узлов <game>! Проверьте структуру XML.');
+        return [];
+    }
+
+    const hands = [];
+
+    for (let i = 0; i < gameNodes.length; i++) {
+        const gameNode = gameNodes[i];
+        const gamecode = gameNode.getAttribute('gamecode');
+        if (!gamecode) {
+            console.log('⚠️ Пропущен game #' + i + ' - нет gamecode');
+            continue;
+        }
+
+        const generalNode = gameNode.querySelector('general');
+        if (!generalNode) {
+            console.log('⚠️ Пропущен game #' + i + ' - нет general');
+            continue;
+        }
+
+        const startDate = generalNode.querySelector('startdate')?.textContent;
+        if (!startDate) {
+            console.log('⚠️ Пропущен game #' + i + ' - нет startdate');
+            continue;
+        }
+
+        const playersNode = generalNode.querySelector('players');
+        if (!playersNode) {
+            console.log('⚠️ Пропущен game #' + i + ' - нет players');
+            continue;
+        }
+
+        const playerNodes = playersNode.querySelectorAll('player');
+        if (playerNodes.length === 0) {
+            console.log('⚠️ Пропущен game #' + i + ' - нет player');
+            continue;
+        }
+
+        // Находим большого блайнда
+        let bigBlind = 0;
+        const round0 = gameNode.querySelector('round[no="0"]');
+        if (round0) {
+            const actions0 = round0.querySelectorAll('action');
+            for (let a = 0; a < actions0.length; a++) {
+                const action = actions0[a];
+                const type = parseInt(action.getAttribute('type'));
+                if (type === ACTION_TYPES.BB) {
+                    bigBlind = cleanSum(action.getAttribute('sum'));
+                    break;
+                }
+            }
+        }
+
+        const actions = parseActions(gameNode, '');
+        const totalPlayers = playerNodes.length;
+
+        // Создаём объект раздачи
+        const hand = {
+            gamecode: gamecode,
+            startDate: parseDateTime(startDate),
+            heroName: '',
+            heroCards: null,
+            heroPosition: '',
+            totalPlayers: totalPlayers,
+            bigBlind: bigBlind,
+            limit: Math.round(bigBlind * 100),
+            totalInvested: 0,
+            win: 0,
+            result: 0,
+            wentToShowdown: false,
+            actions: actions,
+            players: Array.from(playerNodes).map(p => ({
+                name: p.getAttribute('name'),
+                isHero: false,
+                seat: parseInt(p.getAttribute('seat') || 0),
+                bet: cleanSum(p.getAttribute('bet')),
+                win: cleanSum(p.getAttribute('win'))
+            }))
+        };
+
+        hands.push(hand);
+    }
+
+    console.log('✅ Всего раздач:', hands.length);
+    return hands;
+}
+
+// ===== ПАРСИМ XML ДЛЯ КОНКРЕТНОГО ИГРОКА =====
 function parseXMLFile(xmlString, heroNick) {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, 'text/xml');

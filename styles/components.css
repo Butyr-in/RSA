@@ -108,13 +108,14 @@
 /* ===== Widgets ===== */
 .widgets {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);  /* Было 5, теперь 4 */
   gap: 12px;
   margin-bottom: 16px;
 }
 
 .widget {
   background: var(--bg-card);
+  text-align: center;
   border-radius: 12px;
   padding: 16px 20px;
   box-shadow: var(--shadow-sm);
@@ -216,11 +217,11 @@
 .day-list {
   background: var(--bg-secondary);
   border-radius: 12px;
-  padding: 8px 0;
+  padding: 0px 0;
   margin-bottom: 16px;
   box-shadow: var(--shadow-sm);
-  min-height: 0;  /* Разрешаем flex-элементу сжиматься */
-  flex-shrink: 1; /* ВАЖНО: Переопределяем запрет на сжатие от родителя! */
+  min-height: 0;
+  flex-shrink: 1;
   overflow: hidden;
   overflow-y: auto;
   overflow-x: hidden;
@@ -296,6 +297,7 @@
 .day-sessions {
   background: var(--bg-primary);
   padding: 0 16px 8px 16px;
+  border-top: 2px solid var(--border-color);
 }
 
 .session-item {
@@ -305,7 +307,7 @@
   padding: 6px 12px;
   border-radius: 6px;
   margin: 4px 0;
-  background: var(--bg-card);
+  background: var(--bg-hover);  /* Более заметный контраст */
   font-size: 13px;
 }
 .session-item:hover {
@@ -408,14 +410,18 @@
   outline: none;
 }
 
+input[type="number"] {
+  text-align: center;
+}
+
 /* ===== Убираем стрелки у number input ===== */
-.currency-input::-webkit-outer-spin-button,
-.currency-input::-webkit-inner-spin-button {
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-.currency-input[type="number"] {
+input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
@@ -442,16 +448,19 @@
   gap: 16px;
 }
 
+/* ===== Copyright ===== */
 .copyright {
   font-size: 13px;
   color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition-speed);
 }
 
-.telegram-link {
-  color: var(--color-accent);
-  text-decoration: none;
-  font-size: 13px;
+.copyright:hover {
+  color: var(--text-primary);
+  text-decoration: none;  /* Убираем подчёркивание */
 }
+
 .telegram-link:hover {
   text-decoration: underline;
 }
@@ -936,4 +945,148 @@
 #themeToggle:hover {
   background: var(--bg-hover);
   transform: scale(1.1);
+}
+
+/* ===== Alias Button ===== */
+#aliasBtn {
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-input);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-speed);
+}
+
+#aliasBtn:hover {
+  background: var(--bg-hover);
+  transform: scale(1.1);
+}
+
+/* ===== Кнопка Готово ===== */
+#progressActions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+}
+
+#closeImportBtn {
+  min-width: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 32px;
+}
+
+/* ===== Day List Header ===== */
+.day-list-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  padding: 12px 16px;
+  padding-right: 10px;
+  background: var(--bg-secondary);
+  border-radius: 12px 12px 0 0;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.day-list-header {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.day-list-header span {
+  text-align: center;
+}
+
+.day-list-header span:first-child {
+  text-align: left;
+}
+
+.day-list-header span:last-child {
+  text-align: right;
+}
+
+/* ===== Day Item ===== */
+.day-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  padding: 10px 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background var(--transition-speed);
+}
+
+.day-item:hover {
+  background: var(--bg-hover);
+}
+
+.day-item > span {
+  text-align: center;
+}
+
+.day-item > span:first-child {
+  text-align: left;
+}
+
+.day-item > span:last-child {
+  text-align: right;
+}
+
+/* ===== Day Sessions ===== */
+.day-sessions {
+  background: var(--bg-primary);  /* Был var(--bg-secondary) */
+  padding: 0 16px 8px 16px;
+}
+
+.session-item {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+  padding: 6px 12px;
+  align-items: center;
+  background: var(--bg-card);
+  font-size: 13px;  /* Тот же размер, что и дни */
+  margin: 4px 0;
+  border-radius: 6px;
+}
+
+.session-item:hover {
+  background: var(--bg-hover);
+}
+
+.session-item > span {
+  text-align: center;
+  font-size: 13px;  /* Тот же размер */
+}
+
+.session-item > span:first-child {
+  text-align: left;
+}
+
+.session-item > span:last-child {
+  text-align: right;
+}
+
+.session-time {
+  color: var(--text-secondary);
+}
+
+.session-hands {
+  color: var(--text-muted);
+}
+
+.session-result {
+  font-weight: 600;
 }
